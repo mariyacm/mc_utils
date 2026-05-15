@@ -36,6 +36,8 @@
   .hlt-input { font-family: var(--mono); font-size: 11px; width: 100%; padding: 7px 9px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg); color: var(--text); margin-top: 4px; }
   .hlt-input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
   .hlt-hint { font-size: 10px; color: var(--text-lo); margin-top: 4px; line-height: 1.5; }
+  .num-input { font-family: var(--mono); font-size: 11px; width: 70px; padding: 5px 7px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg); color: var(--text); margin-top: 4px; }
+  .num-input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
   .legend { display: flex; flex-direction: column; gap: 6px; }
   .legend-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-mid); }
   canvas#leg { border-radius: 3px; vertical-align: middle; border: 1px solid var(--border); }
@@ -44,6 +46,8 @@
   .swatch.strand { background: #E6F2DC; border-color: var(--green); }
   .swatch.hlt    { background: #D3D1C7; border: 2px solid #111; }
   .swatch.nodata { background: #E8E6DE; border: 1px dashed #AAA8A0; }
+  .swatch.dot    { width: 9px; height: 9px; border-radius: 50%; background: #D85A30; border: none; flex-shrink: 0; }
+  .swatch.ebar   { width: 8px; height: 14px; background: #B5D4F4; border: .5px solid #3A7AC8; border-radius: 2px; flex-shrink: 0; }
   .editor-grid { display: flex; flex-direction: column; gap: 12px; }
   .editor-block { display: flex; flex-direction: column; gap: 4px; }
   .editor-block .col-label { font-family: var(--mono); font-size: 10px; color: var(--text-lo); }
@@ -59,7 +63,7 @@
   .update-btn:hover { background: var(--accent); }
   #vizpanel { padding: 24px 24px 24px 28px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
   #tooltip-bar { font-family: var(--mono); font-size: 12px; color: var(--accent); height: 18px; letter-spacing: .02em; }
-  #svgwrap { overflow-x: auto; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+  #svgwrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
   #sv { display: block; }
   .arc { fill: none; cursor: pointer; stroke: #8A8880; stroke-width: .8; opacity: .45; transition: opacity .1s, stroke-width .1s; }
   .arc.hi  { opacity: .92; stroke-width: 2; stroke: var(--accent); }
@@ -84,6 +88,8 @@
       <div class="section-label">Display</div>
       <label class="row"><input type="checkbox" id="ccon" checked onchange="render()"> Contacts</label>
       <label class="row"><input type="checkbox" id="css"  checked onchange="render()"> Secondary structure</label>
+      <label class="row"><input type="checkbox" id="centr" checked onchange="render()"> Entropy bars</label>
+      <label class="row"><input type="checkbox" id="cact" checked onchange="render()"> Activity dots</label>
     </div>
     <div>
       <div class="section-label">Color scale</div>
@@ -96,6 +102,11 @@
       </select>
     </div>
     <div>
+      <div class="section-label">Activity threshold</div>
+      <input type="number" class="num-input" id="actthresh" value="1" step="0.1" onchange="render()">
+      <div class="hlt-hint">Dots shown for positions with mean_activity ≥ this value.</div>
+    </div>
+    <div>
       <div class="section-label">Residues of interest</div>
       <input type="text" class="hlt-input" id="ihlt" placeholder="N71, C88, D102" oninput="render()">
       <div class="hlt-hint">Comma-separated. Accepts labels (N71) or plain positions.</div>
@@ -104,14 +115,16 @@
       <div class="section-label">Legend</div>
       <div class="legend">
         <div class="legend-row">
-          <span style="font-size:10px;color:var(--text-lo)">low</span>
-          <canvas id="leg" width="80" height="10"></canvas>
-          <span style="font-size:10px;color:var(--text-lo)">high</span>
+          <span id="leg-min" style="font-family:var(--mono);font-size:10px;color:var(--text-lo)">0</span>
+          <canvas id="leg" width="70" height="10"></canvas>
+          <span id="leg-max" style="font-family:var(--mono);font-size:10px;color:var(--text-lo)">20</span>
         </div>
         <div class="legend-row">
           <svg width="22" height="14" style="vertical-align:middle"><path d="M2,13 C2,2 20,2 20,13" fill="none" stroke="#8A8880" stroke-width=".9"/></svg>
           Contact
         </div>
+        <div class="legend-row"><span class="swatch ebar"></span> Shannon entropy</div>
+        <div class="legend-row"><span class="swatch dot"></span> Active position</div>
         <div class="legend-row"><span class="swatch helix"></span> α helix</div>
         <div class="legend-row"><span class="swatch strand"></span> β strand</div>
         <div class="legend-row"><span class="swatch hlt"></span> Residue of interest</div>
@@ -122,7 +135,7 @@
       <div class="section-label">Load data</div>
       <div class="editor-grid">
         <div class="editor-block">
-          <div class="col-label">coverage · position, residue, num_aa</div>
+          <div class="col-label">coverage · position, residue, num_aa [,entropy] [,mean_activity]</div>
           <div class="upload-row">
             <button class="upload-btn" onclick="document.getElementById('f-cov').click()">↑ Upload CSV</button>
             <span class="upload-status" id="s-cov">no file loaded</span>
@@ -177,9 +190,9 @@ function loadFile(input, textareaId, statusId){
 }
 
 const SC={
-  'White → Purple': {lo:[255,255,255],hi:[90,75,180]},
-  'White → Red':    {lo:[255,255,255],hi:[200,50,40]},
-  'White → Blue':   {lo:[255,255,255],hi:[30,100,200]},
+  'White → Purple': {lo:[252,251,253],hi:[63,0,125]},
+  'White → Red':    {lo:[255,245,245],hi:[180,20,20]},
+  'White → Blue':   {lo:[245,248,255],hi:[20,60,180]},
   'Gray → Red':     {lo:[212,210,200],hi:[216,90,48]},
   'Gray → Blue':    {lo:[212,210,200],hi:[55,138,221]},
 };
@@ -190,14 +203,17 @@ function tc(lo,hi,t){
 }
 function isND(v){return v===null||v===undefined||v===''||Number.isNaN(v)||(typeof v==='string'&&v.trim().toLowerCase()==='nan');}
 function parseHlt(s){const p=new Set();(s.match(/\d+/g)||[]).forEach(n=>p.add(+n));return p;}
+
 function pmut(s){
   const r=[];
   for(const l of s.trim().split('\n').slice(1)){
-    const p=l.split(',');if(p.length<2)continue;
-    const pos=+p[0];let res='',num;
-    if(p.length>=3&&isNaN(+p[1])){res=p[1].trim();num=p[2].trim();}else num=p[1]?.trim();
-    const nv=isND(num)?null:+num;
-    if(!isNaN(pos))r.push({pos,res,num:nv});
+    const p=l.split(','); if(p.length<2)continue;
+    const pos=+p[0]; let res='',ci=1;
+    if(p.length>=3&&isNaN(+p[1])){res=p[1].trim();ci=2;}
+    const num     = isND(p[ci]?.trim())   ? null : +p[ci].trim();
+    const entropy = isND(p[ci+1]?.trim()) ? null : +p[ci+1].trim();
+    const activity= isND(p[ci+2]?.trim()) ? null : +p[ci+2].trim();
+    if(!isNaN(pos)) r.push({pos,res,num,entropy,activity});
   }
   return r;
 }
@@ -215,10 +231,8 @@ function pss(s){
     return p.length>=3?{type:p[0].trim(),start:+p[1],end:+p[2]}:null;
   }).filter(x=>x&&x.type&&!isNaN(x.start)&&!isNaN(x.end));
 }
-
-function assignHeights(cons, xf){
-  // More levels with finer steps so 264 contacts fit without overflow
-  const LEVELS=[8,14,21,29,38,48,59,71,84,98,113,128,144,160];
+function assignHeights(cons,xf){
+  const LEVELS=[8,14,21,29,38,48,59,71,84,98,113,128,144,160,178,196];
   const GAP=3;
   const arcs=cons.map(c=>({...c,xa:xf(c.a),xb:xf(c.b)})).sort((a,b)=>(a.b-a.a)-(b.b-b.a));
   const taken=LEVELS.map(()=>[]);
@@ -228,57 +242,75 @@ function assignHeights(cons, xf){
       const ok=!taken[li].some(s=>arc.xa<s.xb+GAP&&arc.xb>s.xa-GAP);
       if(ok){arc.ah=LEVELS[li];taken[li].push({xa:arc.xa,xb:arc.xb});placed=true;break;}
     }
-    if(!placed) arc.ah=LEVELS[LEVELS.length-1];
+    if(!placed)arc.ah=LEVELS[LEVELS.length-1];
   }
   return arcs;
 }
 
 function render(){
-  const muts=pmut(document.getElementById('imut').value);
-  const cons=pcon(document.getElementById('icon').value);
-  const ss  =pss(document.getElementById('iss').value);
-  const hlts=parseHlt(document.getElementById('ihlt').value);
-  const showCon=document.getElementById('ccon').checked;
-  const showSS =document.getElementById('css').checked;
-  const scale=SC[document.getElementById('cscl').value]||SC['White → Purple'];
+  const muts    = pmut(document.getElementById('imut').value);
+  const cons    = pcon(document.getElementById('icon').value);
+  const ss      = pss(document.getElementById('iss').value);
+  const hlts    = parseHlt(document.getElementById('ihlt').value);
+  const showCon = document.getElementById('ccon').checked;
+  const showSS  = document.getElementById('css').checked;
+  const showEntr= document.getElementById('centr').checked;
+  const showAct = document.getElementById('cact').checked;
+  const actThresh = +document.getElementById('actthresh').value;
+  const scale   = SC[document.getElementById('cscl').value]||SC['White → Purple'];
   if(!muts.length)return;
 
-  const n=Math.max(...muts.map(d=>d.pos));
-  const valid=muts.map(d=>d.num).filter(v=>!isND(v));
-  const maxAA=valid.length?Math.max(...valid):1;
-  const minAA=valid.length?Math.min(...valid):0;
+  const n      = Math.max(...muts.map(d=>d.pos));
+  const valid  = muts.map(d=>d.num).filter(v=>!isND(v));
+  const maxAA  = valid.length ? Math.max(...valid) : 1;
+  const minAA  = valid.length ? Math.min(...valid) : 0;
 
-  const ML=20,MR=15,PW=10,PH=38;
-  const avail=Math.max(700,document.getElementById('vizpanel').clientWidth-52);
-  const SP=Math.max(13,Math.min(22,(avail-ML-MR)/n));
-  const W=ML+n*SP+MR;
+  const hasEntropy  = muts.some(d=>d.entropy!==null);
+  const hasActivity = muts.some(d=>d.activity!==null);
+  const maxEntropy  = hasEntropy ? Math.max(...muts.map(d=>d.entropy??0)) : 1;
 
-  // Compute max arc height needed
-  const arcData=showCon?assignHeights(cons,p=>ML+(p-0.5)*SP):[];
-  const maxAH=arcData.length?Math.max(...arcData.map(a=>a.ah)):0;
+  const ML=20,MR=30,PW=10,PH=38;
+  const EBAR_MAX = showEntr && hasEntropy ? 20 : 0;  // max entropy bar height px
+  const EBAR_GAP = EBAR_MAX > 0 ? 4 : 0;
+  const DOT_R    = 3.5;
+  const DOT_GAP  = showAct && hasActivity ? DOT_R*2+3 : 0;
 
-  // BY = pill center Y; position it so arcs fit above with 20px margin
-  const ARC_MARGIN=20;
-  const BY=maxAH+ARC_MARGIN+PH/2;
-  const PT=BY-PH/2;
-  const PB=BY+PH/2;
-  const SS_TOP=PB+5,SS_H=14;
-  const TICK_Y=SS_TOP+SS_H+3,LABY=TICK_Y+13;
-  const SVG_H=LABY+11;
+  const avail = Math.max(700, document.getElementById('vizpanel').clientWidth-52);
+  const SP    = Math.max(13, Math.min(22,(avail-ML-MR)/n));
+  const W     = ML+n*SP+MR;
+  const xf    = p=>ML+(p-0.5)*SP;
 
-  const xf=p=>ML+(p-0.5)*SP;
-  const cov=Object.fromEntries(muts.map(d=>[d.pos,{num:d.num,res:d.res}]));
-  const did='nd'+Date.now();
+  const arcData = showCon ? assignHeights(cons, xf) : [];
+  const maxAH   = arcData.length ? Math.max(...arcData.map(a=>a.ah)) : 0;
+
+  // Vertical layout — compute BY so everything fits
+  const ARC_MARGIN = 20;
+  const BY   = maxAH + ARC_MARGIN + DOT_GAP + PH/2;
+  const PT   = BY - PH/2;
+  const PB   = BY + PH/2;
+  const EBAR_TOP  = PB + EBAR_GAP;
+  const SS_TOP    = EBAR_TOP + EBAR_MAX + (EBAR_MAX>0?4:0);
+  const SS_H      = 14;
+  const TICK_Y    = SS_TOP + SS_H + 3;
+  const LABY      = TICK_Y + 13;
+  const SVG_H     = LABY + 11;
+
+  const cov = Object.fromEntries(muts.map(d=>[d.pos,d]));
+  const did = 'nd'+Date.now();
 
   let h=`<defs><pattern id="${did}" patternUnits="userSpaceOnUse" width="5" height="5" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="5" stroke="#C8C6BE" stroke-width="2"/></pattern></defs>`;
+
+  // backbone
   h+=`<line x1="${xf(1).toFixed(1)}" y1="${BY}" x2="${xf(n).toFixed(1)}" y2="${BY}" stroke="#D8D6CC" stroke-width=".6"/>`;
 
+  // ticks
   for(let i=10;i<=n;i+=10){
     const cx=xf(i).toFixed(1);
     h+=`<line x1="${cx}" y1="${TICK_Y}" x2="${cx}" y2="${TICK_Y+4}" stroke="#BFBCAC" stroke-width=".5"/>`;
     h+=`<text x="${cx}" y="${LABY}" text-anchor="middle" font-size="9" fill="#BFBCAC" font-family="JetBrains Mono,monospace">${i}</text>`;
   }
 
+  // secondary structure
   if(showSS){
     for(const s of ss){
       const xs=xf(s.start)-PW/2,xe=xf(s.end)+PW/2,w=xe-xs,mx=(xs+xe)/2;
@@ -294,51 +326,86 @@ function render(){
     }
   }
 
+  // arcs
   for(const arc of arcData){
     const{xa,xb,ah,a,b}=arc;
-    const top=(PT-ah).toFixed(1);
+    const top=(PT-DOT_GAP-ah).toFixed(1);
     h+=`<path class="arc" data-a="${a}" data-b="${b}" d="M${xa.toFixed(1)},${PT} C${xa.toFixed(1)},${top} ${xb.toFixed(1)},${top} ${xb.toFixed(1)},${PT}"/>`;
   }
 
+  // pills + entropy bars + activity dots
   for(let i=1;i<=n;i++){
-    const cx=xf(i);
-    const e=cov[i]||{num:null,res:''};
-    const nd=isND(e.num);
-    const t=nd?0:(maxAA>minAA?(e.num-minAA)/(maxAA-minAA):0.5);
-    const fill=nd?`url(#${did})`:c3(scale.lo,scale.hi,t);
-    const bgfill=nd?'#E8E6DE':fill;
-    const txtc=nd?'rgba(0,0,0,.4)':tc(scale.lo,scale.hi,t);
-    const label=e.res?`${e.res}${i}`:String(i);
-    const isHlt=hlts.has(i);
-    h+=`<g class="pill" data-pos="${i}" data-num="${nd?'—':e.num}" data-res="${e.res}" data-nd="${nd}">`;
+    const cx  = xf(i);
+    const e   = cov[i]||{num:null,res:'',entropy:null,activity:null};
+    const nd  = isND(e.num);
+    const t   = nd ? 0 : (maxAA>minAA ? (e.num-minAA)/(maxAA-minAA) : 0.5);
+    const fill    = nd ? `url(#${did})` : c3(scale.lo,scale.hi,t);
+    const bgfill  = nd ? '#E8E6DE' : fill;
+    const txtc    = nd ? 'rgba(0,0,0,.4)' : tc(scale.lo,scale.hi,t);
+    const label   = e.res ? `${e.res}${i}` : String(i);
+    const isHlt   = hlts.has(i);
+
+    h+=`<g class="pill" data-pos="${i}" data-num="${nd?'—':e.num}" data-res="${e.res}" data-entropy="${e.entropy??''}" data-activity="${e.activity??''}" data-nd="${nd}">`;
+
+    // pill background (for nodata pattern)
     h+=`<rect x="${(cx-PW/2).toFixed(1)}" y="${PT}" width="${PW}" height="${PH}" rx="4" fill="${bgfill}" stroke="${isHlt?'#111':(nd?'#AAA8A0':'rgba(0,0,0,.14)')}" stroke-width="${isHlt?'2':(nd?'.8':'.5')}" stroke-dasharray="${nd&&!isHlt?'3,2':'none'}"/>`;
+    // pill color fill (on top of pattern bg)
     if(!nd){
       h+=`<rect x="${(cx-PW/2).toFixed(1)}" y="${PT}" width="${PW}" height="${PH}" rx="4" fill="${fill}" stroke="${isHlt?'#111':'rgba(0,0,0,.14)'}" stroke-width="${isHlt?'2':'.5'}"/>`;
     }
+    // label
     h+=`<text transform="rotate(-90,${cx.toFixed(1)},${BY})" x="${cx.toFixed(1)}" y="${BY+.5}" text-anchor="middle" dominant-baseline="central" font-size="8.5" fill="${txtc}" font-family="JetBrains Mono,monospace">${label}</text>`;
+
+    // entropy bar (below pill)
+    if(showEntr && hasEntropy && e.entropy!==null && EBAR_MAX>0){
+      const barH = Math.max(1, (e.entropy/maxEntropy)*EBAR_MAX);
+      const barY = EBAR_TOP + EBAR_MAX - barH;
+      h+=`<rect x="${(cx-PW/2+1).toFixed(1)}" y="${barY.toFixed(1)}" width="${PW-2}" height="${barH.toFixed(1)}" rx="1" fill="#B5D4F4" opacity=".85"/>`;
+    }
+
+    // activity dot (above pill)
+    if(showAct && hasActivity && e.activity!==null && e.activity>=actThresh){
+      const dotY = PT - DOT_R - 2;
+      h+=`<circle cx="${cx.toFixed(1)}" cy="${dotY.toFixed(1)}" r="${DOT_R}" fill="#D85A30" opacity=".9"/>`;
+    }
+
     h+=`</g>`;
   }
 
   const sv=document.getElementById('sv');
-  sv.setAttribute('width',W);sv.setAttribute('viewBox',`0 0 ${W} ${SVG_H}`);sv.setAttribute('height',SVG_H);
+  sv.setAttribute('width',W);
+  sv.setAttribute('viewBox',`0 0 ${W} ${SVG_H}`);
+  sv.setAttribute('height',SVG_H);
   sv.innerHTML=h;
-  drawLeg(scale);
+
+  drawLeg(scale, minAA, maxAA);
   document.getElementById('tooltip-bar').textContent='';
   clrArcs();
 }
 
-function drawLeg(sc){
+function drawLeg(sc, mn, mx){
   const c=document.getElementById('leg'),ctx=c.getContext('2d');
   for(let i=0;i<c.width;i++){ctx.fillStyle=c3(sc.lo,sc.hi,i/(c.width-1));ctx.fillRect(i,0,1,c.height);}
+  // update numeric labels
+  const fmt = v => Number.isInteger(v) ? v : v.toFixed(2);
+  document.getElementById('leg-min').textContent = fmt(mn);
+  document.getElementById('leg-max').textContent = fmt(mx);
 }
 function clrArcs(){document.querySelectorAll('#sv .arc').forEach(a=>a.classList.remove('hi','dim'));}
 
 document.getElementById('sv').addEventListener('mouseover',e=>{
   const pill=e.target.closest('.pill');
-  const arc=e.target.closest('.arc');
+  const arc =e.target.closest('.arc');
   if(pill){
-    const p=+pill.dataset.pos,n=pill.dataset.num,r=pill.dataset.res;
-    document.getElementById('tooltip-bar').textContent=`${r?r+p:'Pos '+p}  ·  ${pill.dataset.nd==='true'?'no data':n}`;
+    const p=+pill.dataset.pos, r=pill.dataset.res;
+    const nd=pill.dataset.nd==='true';
+    const num=pill.dataset.num;
+    const entr=pill.dataset.entropy;
+    const act=pill.dataset.activity;
+    let tip = `${r?r+p:'Pos '+p}  ·  ${nd?'no data':num}`;
+    if(entr) tip += `  ·  H=${(+entr).toFixed(3)}`;
+    if(act)  tip += `  ·  act=${(+act).toFixed(2)}`;
+    document.getElementById('tooltip-bar').textContent=tip;
     let found=false;
     document.querySelectorAll('#sv .arc').forEach(a=>{
       if(+a.dataset.a===p||+a.dataset.b===p){a.classList.add('hi');a.classList.remove('dim');found=true;}
@@ -353,7 +420,7 @@ document.getElementById('sv').addEventListener('mouseout',e=>{
   if(!e.relatedTarget?.closest('#sv')){clrArcs();document.getElementById('tooltip-bar').textContent='';}
 });
 
-drawLeg(SC['White → Purple']);
+drawLeg(SC['White → Purple'], 0, 20);
 window.addEventListener('resize',()=>render());
 </script>
 </body>
