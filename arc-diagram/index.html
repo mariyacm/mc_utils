@@ -3,96 +3,243 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NucB — Mutational Coverage Arc Diagram</title>
+<title>Protein Mutational Coverage — Arc Diagram</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg:       #F7F6F2;
-    --surface:  #FFFFFF;
-    --border:   #E2E0D8;
-    --text:     #1A1916;
-    --text-mid: #5C5A52;
-    --text-lo:  #9A9888;
-    --accent:   #D85A30;
-    --blue:     #3A7AC8;
-    --green:    #4E8A1A;
-    --mono:     'JetBrains Mono', monospace;
-    --sans:     'DM Sans', sans-serif;
+    --bg:         #F7F6F2;
+    --surface:    #FFFFFF;
+    --border:     #E2E0D8;
+    --border-mid: #CCCAB8;
+    --text:       #1A1916;
+    --text-mid:   #5C5A52;
+    --text-lo:    #9A9888;
+    --accent:     #D85A30;
+    --accent-lo:  #F0DDD5;
+    --blue:       #3A7AC8;
+    --blue-lo:    #E0EAFB;
+    --green-lo:   #E6F2DC;
+    --green:      #4E8A1A;
+    --mono:       'JetBrains Mono', monospace;
+    --sans:       'DM Sans', sans-serif;
   }
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { min-height: 100vh; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; }
-  header { border-bottom: 1px solid var(--border); padding: 18px 32px; display: flex; align-items: baseline; gap: 16px; background: var(--surface); }
-  header h1 { font-family: var(--mono); font-size: 15px; font-weight: 600; letter-spacing: -.3px; }
-  header p  { font-size: 12px; color: var(--text-lo); font-weight: 300; }
-  .badge { margin-left: auto; font-family: var(--mono); font-size: 10px; padding: 3px 8px; border: 1px solid var(--border); border-radius: 99px; color: var(--text-mid); background: var(--bg); }
-  main { display: grid; grid-template-columns: 260px 1fr; }
-  aside { border-right: 1px solid var(--border); padding: 20px 18px; min-height: calc(100vh - 53px); background: var(--surface); display: flex; flex-direction: column; gap: 20px; }
-  .section-label { font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text-lo); margin-bottom: 8px; }
-  label.row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-mid); cursor: pointer; padding: 4px 0; user-select: none; }
+  html { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; }
+
+  body {
+    min-height: 100vh;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+  }
+
+  /* ── Header ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 18px 32px;
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    background: var(--surface);
+  }
+  header h1 {
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -.3px;
+    color: var(--text);
+  }
+  header p {
+    font-size: 12px;
+    color: var(--text-lo);
+    font-weight: 300;
+  }
+  .badge {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 3px 8px;
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    color: var(--text-mid);
+    background: var(--bg);
+  }
+
+  /* ── Main layout ── */
+  main {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 0;
+    align-items: start;
+  }
+
+  /* ── Sidebar ── */
+  aside {
+    border-right: 1px solid var(--border);
+    padding: 20px 18px;
+    height: 100%;
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text-lo);
+    margin-bottom: 8px;
+  }
+  label.row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-mid);
+    cursor: pointer;
+    padding: 4px 0;
+    user-select: none;
+  }
   label.row input[type=checkbox] { accent-color: var(--accent); width: 14px; height: 14px; }
-  select { width: 100%; font-family: var(--mono); font-size: 11px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg); color: var(--text); cursor: pointer; margin-top: 2px; }
+  select {
+    width: 100%;
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--bg);
+    color: var(--text);
+    margin-top: 2px;
+    cursor: pointer;
+  }
   select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
-  .hlt-input { font-family: var(--mono); font-size: 11px; width: 100%; padding: 7px 9px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg); color: var(--text); margin-top: 4px; }
+
+  .hlt-input {
+    font-family: var(--mono);
+    font-size: 11px;
+    width: 100%;
+    padding: 7px 9px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--bg);
+    color: var(--text);
+    margin-top: 4px;
+  }
   .hlt-input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
   .hlt-hint { font-size: 10px; color: var(--text-lo); margin-top: 4px; line-height: 1.5; }
+
+  /* Legend */
   .legend { display: flex; flex-direction: column; gap: 6px; }
   .legend-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-mid); }
   canvas#leg { border-radius: 3px; vertical-align: middle; border: 1px solid var(--border); }
   .swatch { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; border: 1px solid transparent; }
-  .swatch.helix  { background: #E0EAFB; border-color: var(--blue); }
-  .swatch.strand { background: #E6F2DC; border-color: var(--green); }
-  .swatch.hlt    { background: #D3D1C7; border: 2px solid #111; }
-  .swatch.nodata { background: #E8E6DE; border: 1px dashed #AAA8A0; }
+  .swatch.helix  { background: var(--blue-lo);  border-color: var(--blue); }
+  .swatch.strand { background: var(--green-lo); border-color: var(--green); }
+  .swatch.hlt    { background: #D3D1C7; border: 2px solid #111; border-radius: 3px; }
+  .arc-swatch svg { vertical-align: middle; }
 
-  /* Editor blocks */
-  .editor-grid { display: flex; flex-direction: column; gap: 12px; }
-  .editor-block { display: flex; flex-direction: column; gap: 4px; }
+  /* Data editor */
+  .editor-grid { display: flex; flex-direction: column; gap: 10px; }
+  .editor-block { display: flex; flex-direction: column; gap: 3px; }
   .editor-block .col-label { font-family: var(--mono); font-size: 10px; color: var(--text-lo); }
-  .upload-row { display: flex; gap: 6px; align-items: center; }
-  .upload-btn {
-    font-family: var(--mono); font-size: 10px; padding: 4px 8px;
-    border: 1px solid var(--border); border-radius: 4px;
-    background: var(--bg); color: var(--text-mid);
-    cursor: pointer; white-space: nowrap; transition: border-color .15s, color .15s;
+  textarea {
+    width: 100%;
+    font-family: var(--mono);
+    font-size: 9.5px;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--bg);
+    color: var(--text);
+    resize: vertical;
+    line-height: 1.5;
   }
-  .upload-btn:hover { border-color: var(--accent); color: var(--accent); }
-  .upload-status { font-family: var(--mono); font-size: 10px; color: var(--text-lo); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .upload-status.ok { color: var(--green); }
-  input[type=file] { display: none; }
-  textarea { width: 100%; font-family: var(--mono); font-size: 9.5px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg); color: var(--text); resize: vertical; line-height: 1.5; }
   textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
-  .update-btn { font-family: var(--mono); font-size: 11px; font-weight: 600; padding: 8px 14px; border: none; border-radius: 6px; background: var(--text); color: var(--bg); cursor: pointer; width: 100%; letter-spacing: .04em; transition: background .15s; margin-top: 2px; }
+  .update-btn {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 8px 14px;
+    border: none;
+    border-radius: 6px;
+    background: var(--text);
+    color: var(--bg);
+    cursor: pointer;
+    width: 100%;
+    letter-spacing: .04em;
+    transition: background .15s;
+  }
   .update-btn:hover { background: var(--accent); }
 
-  #vizpanel { padding: 24px 24px 24px 28px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-  #tooltip-bar { font-family: var(--mono); font-size: 12px; color: var(--accent); height: 18px; letter-spacing: .02em; }
-  #svgwrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+  /* ── Viz panel ── */
+  #vizpanel {
+    padding: 24px 24px 24px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+  }
+  #tooltip-bar {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    height: 18px;
+    letter-spacing: .02em;
+  }
+  #svgwrap {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+  }
   #sv { display: block; }
+
+  /* Arc / pill styles */
   .arc { fill: none; cursor: pointer; stroke: #8A8880; stroke-width: .8; opacity: .5; transition: opacity .1s, stroke-width .1s; }
   .arc.hi  { opacity: .92; stroke-width: 2; stroke: var(--accent); }
   .arc.dim { opacity: .04; }
   .pill { cursor: pointer; }
-  footer { border-top: 1px solid var(--border); padding: 10px 32px; font-family: var(--mono); font-size: 10px; color: var(--text-lo); display: flex; gap: 16px; background: var(--surface); }
+
+  /* ── Footer ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 10px 32px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-lo);
+    display: flex;
+    gap: 16px;
+    background: var(--surface);
+  }
+  footer a { color: var(--text-lo); text-decoration: underline; }
+
   @media (max-width: 800px) {
     main { grid-template-columns: 1fr; }
-    aside { border-right: none; border-bottom: 1px solid var(--border); min-height: unset; }
+    aside { border-right: none; border-bottom: 1px solid var(--border); }
   }
 </style>
 </head>
 <body>
+
 <header>
   <h1>NucB · Mutational Coverage</h1>
   <p>Arc diagram — coverage × contacts × secondary structure</p>
-  <span class="badge">mc_utils</span>
+  <span class="badge">v1.0</span>
 </header>
+
 <main>
+  <!-- ── Sidebar ── -->
   <aside>
+
     <div>
       <div class="section-label">Display</div>
       <label class="row"><input type="checkbox" id="ccon" checked onchange="render()"> Contacts</label>
       <label class="row"><input type="checkbox" id="css"  checked onchange="render()"> Secondary structure</label>
     </div>
+
     <div>
       <div class="section-label">Color scale</div>
       <select id="cscl" onchange="render()">
@@ -101,96 +248,67 @@
         <option>Gray → Purple</option>
       </select>
     </div>
+
     <div>
       <div class="section-label">Residues of interest</div>
       <input type="text" class="hlt-input" id="ihlt" placeholder="N71, C88, D102" oninput="render()">
-      <div class="hlt-hint">Comma-separated. Accepts labels (N71) or plain positions.</div>
+      <div class="hlt-hint">Comma-separated. Accepts labels (N71) or plain position numbers.</div>
     </div>
+
     <div>
       <div class="section-label">Legend</div>
       <div class="legend">
         <div class="legend-row">
-          <span style="font-size:10px;color:var(--text-lo)">low</span>
+          <span style="font-size:10px;color:var(--text-lo)">1 AA</span>
           <canvas id="leg" width="80" height="10"></canvas>
-          <span style="font-size:10px;color:var(--text-lo)">high</span>
+          <span id="lmax" style="font-size:10px;color:var(--text-lo)">– AA</span>
         </div>
         <div class="legend-row">
-          <svg width="22" height="14" style="vertical-align:middle"><path d="M2,13 C2,2 20,2 20,13" fill="none" stroke="#8A8880" stroke-width=".9"/></svg>
+          <svg class="arc-swatch" width="22" height="14"><path d="M2,13 C2,2 20,2 20,13" fill="none" stroke="#8A8880" stroke-width=".9"/></svg>
           Contact
         </div>
         <div class="legend-row"><span class="swatch helix"></span> α helix</div>
         <div class="legend-row"><span class="swatch strand"></span> β strand</div>
         <div class="legend-row"><span class="swatch hlt"></span> Residue of interest</div>
-        <div class="legend-row"><span class="swatch nodata"></span> No data</div>
       </div>
     </div>
 
     <div>
-      <div class="section-label">Load data</div>
+      <div class="section-label">Data editor</div>
       <div class="editor-grid">
-
         <div class="editor-block">
-          <div class="col-label">coverage · position, residue, num_aa</div>
-          <div class="upload-row">
-            <button class="upload-btn" onclick="document.getElementById('f-cov').click()">↑ Upload CSV</button>
-            <span class="upload-status" id="s-cov">no file loaded</span>
-          </div>
-          <input type="file" id="f-cov" accept=".csv,.tsv,.txt" onchange="loadFile(this,'imut','s-cov')">
-          <textarea id="imut" rows="5" placeholder="or paste CSV here..."></textarea>
+          <div class="col-label">position, residue, num_aa</div>
+          <textarea id="imut" rows="6"></textarea>
         </div>
-
         <div class="editor-block">
           <div class="col-label">contacts · pos1, pos2</div>
-          <div class="upload-row">
-            <button class="upload-btn" onclick="document.getElementById('f-con').click()">↑ Upload CSV</button>
-            <span class="upload-status" id="s-con">no file loaded</span>
-          </div>
-          <input type="file" id="f-con" accept=".csv,.tsv,.txt" onchange="loadFile(this,'icon','s-con')">
-          <textarea id="icon" rows="4" placeholder="or paste CSV here..."></textarea>
+          <textarea id="icon" rows="5"></textarea>
         </div>
-
         <div class="editor-block">
           <div class="col-label">2° structure · type, start, end</div>
-          <div class="upload-row">
-            <button class="upload-btn" onclick="document.getElementById('f-ss').click()">↑ Upload CSV</button>
-            <span class="upload-status" id="s-ss">no file loaded</span>
-          </div>
-          <input type="file" id="f-ss" accept=".csv,.tsv,.txt" onchange="loadFile(this,'iss','s-ss')">
-          <textarea id="iss" rows="3" placeholder="or paste CSV here..."></textarea>
+          <textarea id="iss" rows="4"></textarea>
         </div>
-
-        <button class="update-btn" onclick="render()">↻ Update visualization</button>
+        <button class="update-btn" onclick="render()">↻ Update</button>
       </div>
     </div>
+
   </aside>
 
+  <!-- ── Viz panel ── -->
   <div id="vizpanel">
     <div id="tooltip-bar"></div>
-    <div id="svgwrap"><svg id="sv"></svg></div>
+    <div id="svgwrap">
+      <svg id="sv"></svg>
+    </div>
   </div>
 </main>
+
 <footer>
-  <span>NucB · Bacillus licheniformis · PDB 5OMT · Cb-Cb contacts 8 A</span>
-  <span>mc_utils arc diagram</span>
+  <span>Cβ–Cβ contacts · 8 Å cutoff · min seqsep 4</span>
+  <span>Generated by protein_mutvis.py</span>
 </footer>
 
 <script>
-// ── File upload ───────────────────────────────────────────────────────────────
-function loadFile(input, textareaId, statusId) {
-  const file = input.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    document.getElementById(textareaId).value = e.target.result;
-    const s = document.getElementById(statusId);
-    s.textContent = file.name;
-    s.classList.add('ok');
-    render();
-  };
-  reader.readAsText(file);
-}
-
-// ── Color scales ──────────────────────────────────────────────────────────────
 const SC={
   'Gray → Red':    {lo:[212,210,200],hi:[216,90,48]},
   'Gray → Blue':   {lo:[212,210,200],hi:[55,138,221]},
@@ -201,18 +319,14 @@ function tc(lo,hi,t){
   const r=lo[0]+(hi[0]-lo[0])*t,g=lo[1]+(hi[1]-lo[1])*t,b=lo[2]+(hi[2]-lo[2])*t;
   return(.2126*r+.7152*g+.0722*b)>138?'rgba(0,0,0,.72)':'rgba(255,255,255,.88)';
 }
-function isND(v){return v===null||v===undefined||v===''||Number.isNaN(v)||(typeof v==='string'&&v.trim().toLowerCase()==='nan');}
 function parseHlt(s){const p=new Set();(s.match(/\d+/g)||[]).forEach(n=>p.add(+n));return p;}
-
-// ── Parsers ───────────────────────────────────────────────────────────────────
 function pmut(s){
   const r=[];
   for(const l of s.trim().split('\n').slice(1)){
     const p=l.split(',');if(p.length<2)continue;
     const pos=+p[0];let res='',num;
-    if(p.length>=3&&isNaN(+p[1])){res=p[1].trim();num=p[2].trim();}else num=p[1]?.trim();
-    const nv=isND(num)?null:+num;
-    if(!isNaN(pos))r.push({pos,res,num:nv});
+    if(p.length>=3&&isNaN(+p[1])){res=p[1].trim();num=+p[2];}else num=+p[1];
+    if(!isNaN(pos)&&!isNaN(num))r.push({pos,res,num});
   }
   return r;
 }
@@ -230,11 +344,11 @@ function pss(s){
     return p.length>=3?{type:p[0].trim(),start:+p[1],end:+p[2]}:null;
   }).filter(x=>x&&x.type&&!isNaN(x.start)&&!isNaN(x.end));
 }
-
-// ── Arc height assignment ─────────────────────────────────────────────────────
 function assignHeights(cons,xf){
-  const LEVELS=[10,18,28,40,54,70,86];const GAP=3;
-  const arcs=cons.map(c=>({...c,xa:xf(c.a),xb:xf(c.b)})).sort((a,b)=>(a.b-a.a)-(b.b-b.a));
+  const LEVELS=[10,18,28,40,54,70,86];
+  const GAP=3;
+  const arcs=cons.map(c=>({...c,xa:xf(c.a),xb:xf(c.b)}))
+    .sort((a,b)=>(a.b-a.a)-(b.b-b.a));
   const taken=LEVELS.map(()=>[]);
   for(const arc of arcs){
     let placed=false;
@@ -247,7 +361,6 @@ function assignHeights(cons,xf){
   return arcs;
 }
 
-// ── Main render ───────────────────────────────────────────────────────────────
 function render(){
   const muts=pmut(document.getElementById('imut').value);
   const cons=pcon(document.getElementById('icon').value);
@@ -259,22 +372,24 @@ function render(){
   if(!muts.length)return;
 
   const n=Math.max(...muts.map(d=>d.pos));
-  const valid=muts.map(d=>d.num).filter(v=>!isND(v));
-  const maxAA=valid.length?Math.max(...valid):1;
-  const minAA=valid.length?Math.min(...valid):0;
+  const maxAA=Math.max(...muts.map(d=>d.num));
+  const minAA=Math.min(...muts.map(d=>d.num));
 
   const ML=20,MR=15,PW=10,PH=38;
-  const avail=Math.max(700,document.getElementById('vizpanel').clientWidth-52);
+  const wrap=document.getElementById('vizpanel');
+  const avail=Math.max(700,wrap.clientWidth-48);
   const SP=Math.max(13,Math.min(22,(avail-ML-MR)/n));
   const W=ML+n*SP+MR;
+
   const BY=124,PT=BY-PH/2,PB=BY+PH/2;
-  const SS_TOP=PB+5,SS_H=14,TICK_Y=SS_TOP+SS_H+3,LABY=TICK_Y+13,SVG_H=LABY+11;
+  const SS_TOP=PB+5,SS_H=14;
+  const TICK_Y=SS_TOP+SS_H+3,LABY=TICK_Y+13;
+  const SVG_H=LABY+11;
   const xf=p=>ML+(p-0.5)*SP;
   const cov=Object.fromEntries(muts.map(d=>[d.pos,{num:d.num,res:d.res}]));
   const arcData=showCon?assignHeights(cons,xf):[];
-  const did='nd'+Date.now();
 
-  let h=`<defs><pattern id="${did}" patternUnits="userSpaceOnUse" width="5" height="5" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="5" stroke="#C8C6BE" stroke-width="2"/></pattern></defs>`;
+  let h='';
   h+=`<line x1="${xf(1).toFixed(1)}" y1="${BY}" x2="${xf(n).toFixed(1)}" y2="${BY}" stroke="#D8D6CC" stroke-width=".6"/>`;
 
   for(let i=10;i<=n;i+=10){
@@ -288,12 +403,12 @@ function render(){
       const xs=xf(s.start)-PW/2,xe=xf(s.end)+PW/2,w=xe-xs,mx=(xs+xe)/2;
       if(s.type==='helix'){
         h+=`<rect x="${xs.toFixed(1)}" y="${SS_TOP}" width="${w.toFixed(1)}" height="${SS_H}" rx="3" fill="#E0EAFB" stroke="#3A7AC8" stroke-width=".5"/>`;
-        h+=`<text x="${mx.toFixed(1)}" y="${SS_TOP+SS_H/2+1}" text-anchor="middle" dominant-baseline="central" font-size="9" font-weight="500" fill="#0C447C" font-family="DM Sans,sans-serif">α</text>`;
+        h+=`<text x="${mx.toFixed(1)}" y="${SS_TOP+SS_H/2+1}" text-anchor="middle" dominant-baseline="central" font-size="9" font-weight="600" fill="#1A4A8A" font-family="DM Sans,sans-serif">α</text>`;
       }else if(s.type==='sheet'){
         const tip=Math.min(10,w/4),bx2=xe-tip,ym=SS_TOP+SS_H/2;
         const pts=`${xs.toFixed(1)},${SS_TOP+3} ${bx2.toFixed(1)},${SS_TOP+3} ${bx2.toFixed(1)},${SS_TOP} ${xe.toFixed(1)},${ym} ${bx2.toFixed(1)},${SS_TOP+SS_H} ${bx2.toFixed(1)},${SS_TOP+SS_H-3} ${xs.toFixed(1)},${SS_TOP+SS_H-3}`;
         h+=`<polygon points="${pts}" fill="#E6F2DC" stroke="#4E8A1A" stroke-width=".5"/>`;
-        h+=`<text x="${((xs+bx2)/2).toFixed(1)}" y="${ym+1}" text-anchor="middle" dominant-baseline="central" font-size="9" font-weight="500" fill="#27500A" font-family="DM Sans,sans-serif">β</text>`;
+        h+=`<text x="${((xs+bx2)/2).toFixed(1)}" y="${ym+1}" text-anchor="middle" dominant-baseline="central" font-size="9" font-weight="600" fill="#2A5A08" font-family="DM Sans,sans-serif">β</text>`;
       }
     }
   }
@@ -306,34 +421,32 @@ function render(){
 
   for(let i=1;i<=n;i++){
     const cx=xf(i);
-    const e=cov[i]||{num:null,res:''};
-    const nd=isND(e.num);
-    const t=nd?0:(maxAA>minAA?(e.num-minAA)/(maxAA-minAA):0.5);
-    const fill=nd?`url(#${did})`:c3(scale.lo,scale.hi,t);
-    const bgfill=nd?'#E8E6DE':fill;
-    const txtc=nd?'rgba(0,0,0,.4)':tc(scale.lo,scale.hi,t);
+    const e=cov[i]||{num:0,res:''};
+    const t=maxAA>minAA?(e.num-minAA)/(maxAA-minAA):0;
+    const fill=c3(scale.lo,scale.hi,t);
+    const txtc=tc(scale.lo,scale.hi,t);
     const label=e.res?`${e.res}${i}`:String(i);
     const isHlt=hlts.has(i);
-    h+=`<g class="pill" data-pos="${i}" data-num="${nd?'—':e.num}" data-res="${e.res}" data-nd="${nd}">`;
-    h+=`<rect x="${(cx-PW/2).toFixed(1)}" y="${PT}" width="${PW}" height="${PH}" rx="4" fill="${bgfill}" stroke="${isHlt?'#111':(nd?'#AAA8A0':'rgba(0,0,0,.14)')}" stroke-width="${isHlt?'2':(nd?'.8':'.5')}" stroke-dasharray="${nd&&!isHlt?'3,2':'none'}"/>`;
-    if(!nd){
-      h+=`<rect x="${(cx-PW/2).toFixed(1)}" y="${PT}" width="${PW}" height="${PH}" rx="4" fill="${fill}" stroke="${isHlt?'#111':'rgba(0,0,0,.14)'}" stroke-width="${isHlt?'2':'.5'}"/>`;
-    }
+    h+=`<g class="pill" data-pos="${i}" data-num="${e.num}" data-res="${e.res}">`;
+    h+=`<rect x="${(cx-PW/2).toFixed(1)}" y="${PT}" width="${PW}" height="${PH}" rx="4" fill="${fill}" stroke="${isHlt?'#111':'rgba(0,0,0,.14)'}" stroke-width="${isHlt?'2':'.5'}"/>`;
     h+=`<text transform="rotate(-90,${cx.toFixed(1)},${BY})" x="${cx.toFixed(1)}" y="${BY+.5}" text-anchor="middle" dominant-baseline="central" font-size="8.5" fill="${txtc}" font-family="JetBrains Mono,monospace">${label}</text>`;
     h+=`</g>`;
   }
 
   const sv=document.getElementById('sv');
-  sv.setAttribute('width',W);sv.setAttribute('viewBox',`0 0 ${W} ${SVG_H}`);sv.setAttribute('height',SVG_H);
+  sv.setAttribute('width',W);
+  sv.setAttribute('viewBox',`0 0 ${W} ${SVG_H}`);
+  sv.setAttribute('height',SVG_H);
   sv.innerHTML=h;
   drawLeg(scale,minAA,maxAA);
   document.getElementById('tooltip-bar').textContent='';
   clrArcs();
 }
 
-function drawLeg(sc){
+function drawLeg(sc,mn,mx){
   const c=document.getElementById('leg'),ctx=c.getContext('2d');
   for(let i=0;i<c.width;i++){ctx.fillStyle=c3(sc.lo,sc.hi,i/(c.width-1));ctx.fillRect(i,0,1,c.height);}
+  document.getElementById('lmax').textContent=`${mx} AA`;
 }
 function clrArcs(){document.querySelectorAll('#sv .arc').forEach(a=>a.classList.remove('hi','dim'));}
 
@@ -341,8 +454,8 @@ document.getElementById('sv').addEventListener('mouseover',e=>{
   const pill=e.target.closest('.pill');
   const arc=e.target.closest('.arc');
   if(pill){
-    const p=+pill.dataset.pos,n=pill.dataset.num,r=pill.dataset.res;
-    document.getElementById('tooltip-bar').textContent=`${r?r+p:'Pos '+p}  ·  ${pill.dataset.nd==='true'?'no data':n}`;
+    const p=+pill.dataset.pos,n=+pill.dataset.num,r=pill.dataset.res;
+    document.getElementById('tooltip-bar').textContent=`${r?r+p:'Pos '+p}  ·  ${n} AA sampled`;
     let found=false;
     document.querySelectorAll('#sv .arc').forEach(a=>{
       if(+a.dataset.a===p||+a.dataset.b===p){a.classList.add('hi');a.classList.remove('dim');found=true;}
@@ -350,14 +463,38 @@ document.getElementById('sv').addEventListener('mouseover',e=>{
     });
     if(!found)clrArcs();
   }else if(arc){
-    document.getElementById('tooltip-bar').textContent=`Contact ${arc.dataset.a}–${arc.dataset.b}  ·  Δ${arc.dataset.b-arc.dataset.a} residues`;
+    document.getElementById('tooltip-bar').textContent=`Contact  ${arc.dataset.a} – ${arc.dataset.b}  ·  Δ${arc.dataset.b-arc.dataset.a} residues`;
   }
 });
 document.getElementById('sv').addEventListener('mouseout',e=>{
   if(!e.relatedTarget?.closest('#sv')){clrArcs();document.getElementById('tooltip-bar').textContent='';}
 });
 
-drawLeg(SC['Gray → Red']);
+// Sample data
+(function init(){
+  const N=145;
+  let s=42;const rng=()=>{s=(s*1103515245+12345)&0x7fffffff;return s/0x7fffffff;};
+  const AA='LLAGVERIKNSTQDPFYMHCLAGVERST';
+  let ml='position,residue,num_aa\n';
+  for(let i=1;i<=N;i++){
+    const res=AA[Math.floor(rng()*AA.length)];
+    let v=Math.floor(rng()*9)+1;
+    if(i>=55&&i<=85)v=Math.min(20,v+Math.floor(rng()*9)+5);
+    if(i<=8||i>=N-5)v=Math.max(1,Math.floor(rng()*3)+1);
+    ml+=`${i},${res},${Math.min(20,v)}\n`;
+  }
+  const ssRaw=[['helix',6,20],['sheet',25,31],['sheet',36,43],['helix',50,63],
+               ['helix',68,81],['sheet',86,93],['helix',98,110],['sheet',115,121],['helix',126,142]];
+  const craw=[[8,27],[12,30],[17,29],[9,52],[14,56],[19,61],[26,38],[28,40],[31,42],
+    [51,88],[57,91],[62,93],[70,99],[75,103],[80,107],[37,87],[40,90],[43,92],
+    [99,128],[103,132],[107,137],[87,116],[90,118],[93,121],[54,127],[60,133],[57,130],[19,99],[16,102],[28,87],[31,90]];
+  document.getElementById('imut').value=ml.trim();
+  document.getElementById('icon').value='pos1,pos2\n'+craw.map(r=>r.join(',')).join('\n');
+  document.getElementById('iss').value='type,start,end\n'+ssRaw.map(r=>r.join(',')).join('\n');
+  document.getElementById('ihlt').value='N71, C88';
+})();
+
+render();
 window.addEventListener('resize',()=>render());
 </script>
 </body>
