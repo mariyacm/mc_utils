@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>mc_utils</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #F7F6F2;
+    --surface:  #FFFFFF;
+    --border:   #E2E0D8;
+    --text:     #1A1916;
+    --text-mid: #5C5A52;
+    --text-lo:  #9A9888;
+    --accent:   #D85A30;
+    --mono:     'JetBrains Mono', monospace;
+    --sans:     'DM Sans', sans-serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { min-height: 100vh; background: var(--bg); color: var(--text); font-family: var(--sans); }
+
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 32px 48px 28px;
+    background: var(--surface);
+  }
+  header h1 {
+    font-family: var(--mono);
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -.4px;
+  }
+  header p {
+    margin-top: 6px;
+    font-size: 13px;
+    color: var(--text-mid);
+    font-weight: 300;
+  }
+
+  main {
+    padding: 40px 48px;
+    max-width: 900px;
+  }
+
+  .section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-lo);
+    margin-bottom: 16px;
+  }
+
+  .tool-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+  }
+
+  .tool-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 22px;
+    text-decoration: none;
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .tool-card:hover {
+    border-color: var(--accent);
+    box-shadow: 0 2px 12px rgba(216,90,48,.08);
+  }
+  .tool-card .icon { font-size: 22px; line-height: 1; margin-bottom: 4px; }
+  .tool-card h2 { font-family: var(--mono); font-size: 13px; font-weight: 600; letter-spacing: -.2px; }
+  .tool-card p { font-size: 12px; color: var(--text-mid); font-weight: 300; line-height: 1.55; }
+  .tool-card .tag { margin-top: 6px; font-family: var(--mono); font-size: 9px; color: var(--text-lo); letter-spacing: .06em; text-transform: uppercase; }
+
+  .tool-card.placeholder { border-style: dashed; opacity: .5; pointer-events: none; }
+
+  footer {
+    padding: 20px 48px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-lo);
+    border-top: 1px solid var(--border);
+    margin-top: 40px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>mc_utils</h1>
+  <p>Interactive visualizations for structural and mutational analysis</p>
+</header>
+
+<main>
+  <div class="section-label">Available tools</div>
+  <div class="tool-grid">
+
+    <a class="tool-card" href="arc-diagram/">
+      <div class="icon">🧬</div>
+      <h2>Arc Diagram</h2>
+      <p>Mutational coverage, residue contacts, and secondary structure in a single linear view. Color beads by # of AA sampled; highlight catalytic or functional sites.</p>
+      <div class="tag">Coverage · Contacts · 2° Structure</div>
+    </a>
+
+    <div class="tool-card placeholder">
+      <div class="icon">＋</div>
+      <h2>Next tool</h2>
+      <p>Add a new tool by creating a subfolder with an index.html and linking to it here.</p>
+      <div class="tag">Coming soon</div>
+    </div>
+
+  </div>
+</main>
+
+<footer>
+  mc_utils · add tools by creating subfolders, each with its own index.html
+</footer>
+
+</body>
+</html>
