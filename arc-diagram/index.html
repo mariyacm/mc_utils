@@ -267,7 +267,7 @@ function render(){
   const hasEntropy  = muts.some(d=>d.entropy!==null);
   const hasActivity = muts.some(d=>d.activity!==null);
   const maxEntropy  = hasEntropy ? Math.max(...muts.map(d=>d.entropy??0)) : 1;
-  const maxActivity = hasActivity ? Math.max(...muts.map(d=>d.activity??0)) : 1;  // ← missing
+  const maxActivity = hasActivity ? Math.max(...muts.map(d=>d.activity??0)) : 1; 
 
   const ML=20,MR=30,PW=10,PH=38;
   const EBAR_MAX = showEntr && hasEntropy ? 20 : 0;  // max entropy bar height px
