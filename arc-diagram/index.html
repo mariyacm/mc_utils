@@ -46,7 +46,8 @@
   .swatch.strand { background: #E6F2DC; border-color: var(--green); }
   .swatch.hlt    { background: #D3D1C7; border: 2px solid #111; }
   .swatch.nodata { background: #E8E6DE; border: 1px dashed #AAA8A0; }
-  .swatch.dot    { width: 9px; height: 9px; border-radius: 50%; background: #2E8B3A; border: none; flex-shrink: 0; }  .swatch.ebar   { width: 8px; height: 14px; background: #B5D4F4; border: .5px solid #3A7AC8; border-radius: 2px; flex-shrink: 0; }
+  .swatch.dot    { width: 9px; height: 9px; border-radius: 50%; background: #2E8B3A; border: none; flex-shrink: 0; }
+  .swatch.ebar   { width: 8px; height: 14px; background: #B5D4F4; border: .5px solid #3A7AC8; border-radius: 2px; flex-shrink: 0; }
   .editor-grid { display: flex; flex-direction: column; gap: 12px; }
   .editor-block { display: flex; flex-direction: column; gap: 4px; }
   .editor-block .col-label { font-family: var(--mono); font-size: 10px; color: var(--text-lo); }
@@ -63,7 +64,8 @@
   #vizpanel { padding: 24px 24px 24px 28px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
   #tooltip-bar { font-family: var(--mono); font-size: 12px; color: var(--accent); height: 18px; letter-spacing: .02em; }
   #svgwrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
-  #sv { display: block; }
+  #loading { font-family: var(--mono); font-size: 11px; color: var(--text-lo); padding: 40px; text-align: center; }
+  #sv { display: none; }
   .arc { fill: none; cursor: pointer; stroke: #8A8880; stroke-width: .8; opacity: .45; transition: opacity .1s, stroke-width .1s; }
   .arc.hi  { opacity: .92; stroke-width: 2; stroke: var(--accent); }
   .arc.dim { opacity: .04; }
@@ -89,6 +91,7 @@
       <label class="row"><input type="checkbox" id="css"  checked onchange="render()"> Secondary structure</label>
       <label class="row"><input type="checkbox" id="centr" checked onchange="render()"> Entropy bars</label>
       <label class="row"><input type="checkbox" id="cact" checked onchange="render()"> Activity dots</label>
+      <label class="row"><input type="checkbox" id="caas" checked onchange="render()"> Best-activity AAs</label>
     </div>
     <div>
       <div class="section-label">Color scale</div>
@@ -103,7 +106,7 @@
     <div>
       <div class="section-label">Activity threshold</div>
       <input type="number" class="num-input" id="actthresh" value="1" step="0.1" onchange="render()">
-      <div class="hlt-hint">Dots shown for positions with mean_activity ≥ this value.</div>
+      <div class="hlt-hint">Dots shown for positions with max_activity ≥ this value.</div>
     </div>
     <div>
       <div class="section-label">Residues of interest</div>
@@ -124,6 +127,10 @@
         </div>
         <div class="legend-row"><span class="swatch ebar"></span> Shannon entropy</div>
         <div class="legend-row"><span class="swatch dot"></span> Active position</div>
+        <div class="legend-row">
+          <span style="font-family:var(--mono);font-size:9px;color:#2E8B3A;font-weight:600">K</span>
+          Best-activity AAs
+        </div>
         <div class="legend-row"><span class="swatch helix"></span> α helix</div>
         <div class="legend-row"><span class="swatch strand"></span> β strand</div>
         <div class="legend-row"><span class="swatch hlt"></span> Residue of interest</div>
@@ -132,12 +139,13 @@
     </div>
     <div>
       <div class="section-label">Load data</div>
+      <div class="hlt-hint" style="margin-bottom:6px">Default NucB data loads automatically. Upload your own CSVs to replace.</div>
       <div class="editor-grid">
         <div class="editor-block">
-          <div class="col-label">coverage · position, residue, num_aa [,entropy] [,mean_activity]</div>
+          <div class="col-label">coverage · position, residue, num_aa [,entropy] [,max_activity] [,max_activity_aas]</div>
           <div class="upload-row">
             <button class="upload-btn" onclick="document.getElementById('f-cov').click()">↑ Upload CSV</button>
-            <span class="upload-status" id="s-cov">no file loaded</span>
+            <span class="upload-status" id="s-cov">loading…</span>
           </div>
           <input type="file" id="f-cov" accept=".csv,.tsv,.txt" onchange="loadFile(this,'imut','s-cov')">
           <textarea id="imut" rows="4" placeholder="or paste CSV here..."></textarea>
@@ -146,7 +154,7 @@
           <div class="col-label">contacts · pos1, pos2</div>
           <div class="upload-row">
             <button class="upload-btn" onclick="document.getElementById('f-con').click()">↑ Upload CSV</button>
-            <span class="upload-status" id="s-con">no file loaded</span>
+            <span class="upload-status" id="s-con">loading…</span>
           </div>
           <input type="file" id="f-con" accept=".csv,.tsv,.txt" onchange="loadFile(this,'icon','s-con')">
           <textarea id="icon" rows="4" placeholder="or paste CSV here..."></textarea>
@@ -155,7 +163,7 @@
           <div class="col-label">2° structure · type, start, end</div>
           <div class="upload-row">
             <button class="upload-btn" onclick="document.getElementById('f-ss').click()">↑ Upload CSV</button>
-            <span class="upload-status" id="s-ss">no file loaded</span>
+            <span class="upload-status" id="s-ss">loading…</span>
           </div>
           <input type="file" id="f-ss" accept=".csv,.tsv,.txt" onchange="loadFile(this,'iss','s-ss')">
           <textarea id="iss" rows="3" placeholder="or paste CSV here..."></textarea>
@@ -167,15 +175,19 @@
 
   <div id="vizpanel">
     <div id="tooltip-bar"></div>
-    <div id="svgwrap"><svg id="sv"></svg></div>
+    <div id="svgwrap">
+      <div id="loading">Loading NucB data…</div>
+      <svg id="sv"></svg>
+    </div>
   </div>
 </main>
 <footer>
-  <span>NucB · Bacillus licheniformis · PDB 5OMT · Cb-Cb contacts 8 A</span>
+  <span>NucB · Bacillus licheniformis · PDB 5OMT · Cβ–Cβ contacts 8 Å</span>
   <span>mc_utils arc diagram</span>
 </footer>
 
 <script>
+// ── File upload ───────────────────────────────────────────────────────────────
 function loadFile(input, textareaId, statusId){
   const file=input.files[0]; if(!file)return;
   const reader=new FileReader();
@@ -188,8 +200,9 @@ function loadFile(input, textareaId, statusId){
   reader.readAsText(file);
 }
 
+// ── Color scales ──────────────────────────────────────────────────────────────
 const SC={
-  'White → Purple': {lo:[252,251,253],hi:[127,95,190]},
+  'White → Purple': {lo:[252,251,253],hi:[160,130,210]},  // softer purple
   'White → Red':    {lo:[255,245,245],hi:[180,20,20]},
   'White → Blue':   {lo:[245,248,255],hi:[20,60,180]},
   'Gray → Red':     {lo:[212,210,200],hi:[216,90,48]},
@@ -203,16 +216,28 @@ function tc(lo,hi,t){
 function isND(v){return v===null||v===undefined||v===''||Number.isNaN(v)||(typeof v==='string'&&v.trim().toLowerCase()==='nan');}
 function parseHlt(s){const p=new Set();(s.match(/\d+/g)||[]).forEach(n=>p.add(+n));return p;}
 
+// ── CSV parsers ───────────────────────────────────────────────────────────────
 function pmut(s){
+  const lines=s.trim().split('\n');
+  if(lines.length<2)return[];
+  const hdr=lines[0].split(',').map(h=>h.trim().toLowerCase());
+  const posIdx  = hdr.indexOf('position');
+  const resIdx  = hdr.indexOf('residue');
+  const numIdx  = hdr.indexOf('num_aa');
+  const entrIdx = hdr.indexOf('entropy');
+  const actIdx  = hdr.findIndex(h=>h==='max_activity'||h==='mean_activity');
+  const aasIdx  = hdr.indexOf('max_activity_aas');
   const r=[];
-  for(const l of s.trim().split('\n').slice(1)){
-    const p=l.split(','); if(p.length<2)continue;
-    const pos=+p[0]; let res='',ci=1;
-    if(p.length>=3&&isNaN(+p[1])){res=p[1].trim();ci=2;}
-    const num     = isND(p[ci]?.trim())   ? null : +p[ci].trim();
-    const entropy = isND(p[ci+1]?.trim()) ? null : +p[ci+1].trim();
-    const activity= isND(p[ci+2]?.trim()) ? null : +p[ci+2].trim();
-    if(!isNaN(pos)) r.push({pos,res,num,entropy,activity});
+  for(const l of lines.slice(1)){
+    const p=l.split(',');
+    const pos=+(p[posIdx]?.trim());
+    if(isNaN(pos))continue;
+    const res      = p[resIdx]?.trim()??'';
+    const num      = isND(p[numIdx]?.trim())  ? null : +(p[numIdx].trim());
+    const entropy  = isND(p[entrIdx]?.trim()) ? null : +(p[entrIdx]?.trim());
+    const activity = isND(p[actIdx]?.trim())  ? null : +(p[actIdx]?.trim());
+    const aas      = aasIdx>=0 ? (p[aasIdx]?.trim()||null) : null;
+    r.push({pos,res,num,entropy,activity,aas});
   }
   return r;
 }
@@ -230,6 +255,8 @@ function pss(s){
     return p.length>=3?{type:p[0].trim(),start:+p[1],end:+p[2]}:null;
   }).filter(x=>x&&x.type&&!isNaN(x.start)&&!isNaN(x.end));
 }
+
+// ── Arc height assignment ─────────────────────────────────────────────────────
 function assignHeights(cons,xf){
   const LEVELS=[8,14,21,29,38,48,59,71,84,98,113,128,144,160,178,196];
   const GAP=3;
@@ -246,49 +273,65 @@ function assignHeights(cons,xf){
   return arcs;
 }
 
+// ── Main render ───────────────────────────────────────────────────────────────
 function render(){
-  const muts    = pmut(document.getElementById('imut').value);
-  const cons    = pcon(document.getElementById('icon').value);
-  const ss      = pss(document.getElementById('iss').value);
-  const hlts    = parseHlt(document.getElementById('ihlt').value);
-  const showCon = document.getElementById('ccon').checked;
-  const showSS  = document.getElementById('css').checked;
-  const showEntr= document.getElementById('centr').checked;
-  const showAct = document.getElementById('cact').checked;
-  const actThresh = +document.getElementById('actthresh').value;
-  const scale   = SC[document.getElementById('cscl').value]||SC['White → Purple'];
+  const muts     = pmut(document.getElementById('imut').value);
+  const cons     = pcon(document.getElementById('icon').value);
+  const ss       = pss(document.getElementById('iss').value);
+  const hlts     = parseHlt(document.getElementById('ihlt').value);
+  const showCon  = document.getElementById('ccon').checked;
+  const showSS   = document.getElementById('css').checked;
+  const showEntr = document.getElementById('centr').checked;
+  const showAct  = document.getElementById('cact').checked;
+  const showAAs  = document.getElementById('caas').checked;
+  const actThresh= +document.getElementById('actthresh').value;
+  const scale    = SC[document.getElementById('cscl').value]||SC['White → Purple'];
   if(!muts.length)return;
 
-  const n      = Math.max(...muts.map(d=>d.pos));
-  const valid  = muts.map(d=>d.num).filter(v=>!isND(v));
-  const maxAA  = valid.length ? Math.max(...valid) : 1;
-  const minAA  = valid.length ? Math.min(...valid) : 0;
+  document.getElementById('loading').style.display='none';
+  document.getElementById('sv').style.display='block';
+
+  const n       = Math.max(...muts.map(d=>d.pos));
+  const valid   = muts.map(d=>d.num).filter(v=>!isND(v));
+  const maxAA   = valid.length?Math.max(...valid):1;
+  const minAA   = valid.length?Math.min(...valid):0;
 
   const hasEntropy  = muts.some(d=>d.entropy!==null);
   const hasActivity = muts.some(d=>d.activity!==null);
-  const maxEntropy  = hasEntropy ? Math.max(...muts.map(d=>d.entropy??0)) : 1;
-  const maxActivity = hasActivity ? Math.max(...muts.map(d=>d.activity??0)) : 1; 
+  const hasAAs      = muts.some(d=>d.aas!==null&&d.aas!=='');
+  const maxEntropy  = hasEntropy  ? Math.max(...muts.map(d=>d.entropy??0))  : 1;
+  const maxActivity = hasActivity ? Math.max(...muts.map(d=>d.activity??0)) : 1;
 
   const ML=20,MR=30,PW=10,PH=38;
-  const EBAR_MAX = showEntr && hasEntropy ? 20 : 0;  // max entropy bar height px
-  const EBAR_GAP = EBAR_MAX > 0 ? 4 : 0;
-  const DOT_R    = 3.5;
-  const DOT_GAP  = showAct && hasActivity ? DOT_R*2+3 : 0;
+  const AA_FONT    = 7;
+  const AA_LINE_H  = 8;   // px per AA letter line
 
-  const avail = Math.max(700, document.getElementById('vizpanel').clientWidth-52);
-  const SP    = Math.max(13, Math.min(22,(avail-ML-MR)/n));
+  // Pre-calculate max AA lines needed for vertical layout
+  const maxAAsLines = (showAAs && hasAAs)
+    ? Math.max(...muts.map(d=>(d.aas?d.aas.split(',').length:0)))
+    : 0;
+  const AA_BLOCK_H = maxAAsLines * AA_LINE_H;
+  const AA_GAP     = AA_BLOCK_H > 0 ? 3 : 0;
+
+  const EBAR_MAX   = showEntr && hasEntropy ? 20 : 0;
+  const EBAR_GAP   = EBAR_MAX > 0 ? 4 : 0;
+  const DOT_R      = 3.5;
+  const DOT_GAP    = showAct && hasActivity ? DOT_R*2+3 : 0;
+
+  const avail = Math.max(700,document.getElementById('vizpanel').clientWidth-52);
+  const SP    = Math.max(13,Math.min(22,(avail-ML-MR)/n));
   const W     = ML+n*SP+MR;
   const xf    = p=>ML+(p-0.5)*SP;
 
-  const arcData = showCon ? assignHeights(cons, xf) : [];
-  const maxAH   = arcData.length ? Math.max(...arcData.map(a=>a.ah)) : 0;
+  const arcData = showCon?assignHeights(cons,xf):[];
+  const maxAH   = arcData.length?Math.max(...arcData.map(a=>a.ah)):0;
 
-  // Vertical layout — compute BY so everything fits
   const ARC_MARGIN = 20;
-  const BY   = maxAH + ARC_MARGIN + DOT_GAP + PH/2;
-  const PT   = BY - PH/2;
-  const PB   = BY + PH/2;
-  const EBAR_TOP  = PB + EBAR_GAP;
+  const BY        = maxAH + ARC_MARGIN + DOT_GAP + PH/2;
+  const PT        = BY - PH/2;
+  const PB        = BY + PH/2;
+  const AA_TOP    = PB + AA_GAP;
+  const EBAR_TOP  = AA_TOP + AA_BLOCK_H + (AA_BLOCK_H>0?3:0) + EBAR_GAP;
   const SS_TOP    = EBAR_TOP + EBAR_MAX + (EBAR_MAX>0?4:0);
   const SS_H      = 14;
   const TICK_Y    = SS_TOP + SS_H + 3;
@@ -333,40 +376,48 @@ function render(){
     h+=`<path class="arc" data-a="${a}" data-b="${b}" d="M${xa.toFixed(1)},${PT} C${xa.toFixed(1)},${top} ${xb.toFixed(1)},${top} ${xb.toFixed(1)},${PT}"/>`;
   }
 
-  // pills + entropy bars + activity dots
+  // pills + AA labels + entropy bars + activity dots
   for(let i=1;i<=n;i++){
     const cx  = xf(i);
-    const e   = cov[i]||{num:null,res:'',entropy:null,activity:null};
+    const e   = cov[i]||{num:null,res:'',entropy:null,activity:null,aas:null};
     const nd  = isND(e.num);
-    const t   = nd ? 0 : (maxAA>minAA ? (e.num-minAA)/(maxAA-minAA) : 0.5);
-    const fill    = nd ? `url(#${did})` : c3(scale.lo,scale.hi,t);
-    const bgfill  = nd ? '#E8E6DE' : fill;
-    const txtc    = nd ? 'rgba(0,0,0,.4)' : tc(scale.lo,scale.hi,t);
-    const label   = e.res ? `${e.res}${i}` : String(i);
+    const t   = nd?0:(maxAA>minAA?(e.num-minAA)/(maxAA-minAA):0.5);
+    const fill    = nd?`url(#${did})`:c3(scale.lo,scale.hi,t);
+    const bgfill  = nd?'#E8E6DE':fill;
+    const txtc    = nd?'rgba(0,0,0,.4)':tc(scale.lo,scale.hi,t);
+    const label   = e.res?`${e.res}${i}`:String(i);
     const isHlt   = hlts.has(i);
 
-    h+=`<g class="pill" data-pos="${i}" data-num="${nd?'—':e.num}" data-res="${e.res}" data-entropy="${e.entropy??''}" data-activity="${e.activity??''}" data-nd="${nd}">`;
+    h+=`<g class="pill" data-pos="${i}" data-num="${nd?'—':e.num}" data-res="${e.res}" data-entropy="${e.entropy??''}" data-activity="${e.activity??''}" data-aas="${e.aas??''}" data-nd="${nd}">`;
 
-    // pill background (for nodata pattern)
+    // pill rect (bg for nodata pattern)
     h+=`<rect x="${(cx-PW/2).toFixed(1)}" y="${PT}" width="${PW}" height="${PH}" rx="4" fill="${bgfill}" stroke="${isHlt?'#111':(nd?'#AAA8A0':'rgba(0,0,0,.14)')}" stroke-width="${isHlt?'2':(nd?'.8':'.5')}" stroke-dasharray="${nd&&!isHlt?'3,2':'none'}"/>`;
-    // pill color fill (on top of pattern bg)
     if(!nd){
       h+=`<rect x="${(cx-PW/2).toFixed(1)}" y="${PT}" width="${PW}" height="${PH}" rx="4" fill="${fill}" stroke="${isHlt?'#111':'rgba(0,0,0,.14)'}" stroke-width="${isHlt?'2':'.5'}"/>`;
     }
     // label
     h+=`<text transform="rotate(-90,${cx.toFixed(1)},${BY})" x="${cx.toFixed(1)}" y="${BY+.5}" text-anchor="middle" dominant-baseline="central" font-size="8.5" fill="${txtc}" font-family="JetBrains Mono,monospace">${label}</text>`;
 
-    // entropy bar (below pill)
+    // best-activity AA letters (below pill, one per line)
+    if(showAAs && hasAAs && e.aas && e.aas!==''){
+      const letters=e.aas.split(',');
+      letters.forEach((aa,li)=>{
+        const y=AA_TOP + li*AA_LINE_H + AA_FONT;
+        h+=`<text x="${cx.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" font-size="${AA_FONT}" font-weight="600" fill="#2E8B3A" font-family="JetBrains Mono,monospace">${aa.trim()}</text>`;
+      });
+    }
+
+    // entropy bar
     if(showEntr && hasEntropy && e.entropy!==null && EBAR_MAX>0){
-      const barH = Math.max(1, (e.entropy/maxEntropy)*EBAR_MAX);
-      const barY = EBAR_TOP + EBAR_MAX - barH;
+      const barH=Math.max(1,(e.entropy/maxEntropy)*EBAR_MAX);
+      const barY=EBAR_TOP+EBAR_MAX-barH;
       h+=`<rect x="${(cx-PW/2+1).toFixed(1)}" y="${barY.toFixed(1)}" width="${PW-2}" height="${barH.toFixed(1)}" rx="1" fill="#B5D4F4" opacity=".85"/>`;
     }
 
     // activity dot (above pill)
     if(showAct && hasActivity && e.activity!==null && e.activity>=actThresh){
-      const dotR = DOT_R * (e.activity / maxActivity);  // scale by activity
-      const dotY = PT - dotR - 2;
+      const dotR=DOT_R*(e.activity/maxActivity);
+      const dotY=PT-dotR-2;
       h+=`<circle cx="${cx.toFixed(1)}" cy="${dotY.toFixed(1)}" r="${dotR.toFixed(1)}" fill="#2E8B3A" opacity=".9"/>`;
     }
 
@@ -378,19 +429,17 @@ function render(){
   sv.setAttribute('viewBox',`0 0 ${W} ${SVG_H}`);
   sv.setAttribute('height',SVG_H);
   sv.innerHTML=h;
-
-  drawLeg(scale, minAA, maxAA);
+  drawLeg(scale,minAA,maxAA);
   document.getElementById('tooltip-bar').textContent='';
   clrArcs();
 }
 
-function drawLeg(sc, mn, mx){
+function drawLeg(sc,mn,mx){
   const c=document.getElementById('leg'),ctx=c.getContext('2d');
   for(let i=0;i<c.width;i++){ctx.fillStyle=c3(sc.lo,sc.hi,i/(c.width-1));ctx.fillRect(i,0,1,c.height);}
-  // update numeric labels
-  const fmt = v => Number.isInteger(v) ? v : v.toFixed(2);
-  document.getElementById('leg-min').textContent = fmt(mn);
-  document.getElementById('leg-max').textContent = fmt(mx);
+  const fmt=v=>Number.isInteger(v)?v:v.toFixed(2);
+  document.getElementById('leg-min').textContent=fmt(mn);
+  document.getElementById('leg-max').textContent=fmt(mx);
 }
 function clrArcs(){document.querySelectorAll('#sv .arc').forEach(a=>a.classList.remove('hi','dim'));}
 
@@ -398,14 +447,13 @@ document.getElementById('sv').addEventListener('mouseover',e=>{
   const pill=e.target.closest('.pill');
   const arc =e.target.closest('.arc');
   if(pill){
-    const p=+pill.dataset.pos, r=pill.dataset.res;
+    const p=+pill.dataset.pos,r=pill.dataset.res;
     const nd=pill.dataset.nd==='true';
-    const num=pill.dataset.num;
-    const entr=pill.dataset.entropy;
-    const act=pill.dataset.activity;
-    let tip = `${r?r+p:'Pos '+p}  ·  ${nd?'no data':num}`;
-    if(entr) tip += `  ·  H=${(+entr).toFixed(3)}`;
-    if(act)  tip += `  ·  act=${(+act).toFixed(2)}`;
+    const entr=pill.dataset.entropy,act=pill.dataset.activity,aas=pill.dataset.aas;
+    let tip=`${r?r+p:'Pos '+p}  ·  ${nd?'no data':pill.dataset.num}`;
+    if(entr&&!isND(+entr)) tip+=`  ·  H=${(+entr).toFixed(3)}`;
+    if(act&&!isND(+act))   tip+=`  ·  max_act=${(+act).toFixed(2)}`;
+    if(aas)                tip+=`  ·  best AAs: ${aas}`;
     document.getElementById('tooltip-bar').textContent=tip;
     let found=false;
     document.querySelectorAll('#sv .arc').forEach(a=>{
@@ -421,8 +469,33 @@ document.getElementById('sv').addEventListener('mouseout',e=>{
   if(!e.relatedTarget?.closest('#sv')){clrArcs();document.getElementById('tooltip-bar').textContent='';}
 });
 
-drawLeg(SC['White → Purple'], 0, 20);
+// ── Auto-load default data from repo ─────────────────────────────────────────
+async function loadDefaults(){
+  const files=[
+    {url:'./data/coverage.csv',            id:'imut',sid:'s-cov',label:'coverage.csv (default)'},
+    {url:'./data/contacts.csv',            id:'icon',sid:'s-con',label:'contacts.csv (default)'},
+    {url:'./data/secondary_structure.csv', id:'iss', sid:'s-ss', label:'secondary_structure.csv (default)'},
+  ];
+  await Promise.all(files.map(async f=>{
+    try{
+      const r=await fetch(f.url);
+      if(!r.ok)throw new Error(`${r.status}`);
+      const text=await r.text();
+      document.getElementById(f.id).value=text;
+      const s=document.getElementById(f.sid);
+      s.textContent=f.label; s.classList.add('ok');
+    }catch{
+      const s=document.getElementById(f.sid);
+      s.textContent='not found — upload your own';
+      s.style.color='var(--text-lo)';
+    }
+  }));
+  render();
+}
+
+drawLeg(SC['White → Purple'],0,20);
 window.addEventListener('resize',()=>render());
+loadDefaults();
 </script>
 </body>
 </html>
