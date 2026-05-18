@@ -217,6 +217,17 @@ function isND(v){return v===null||v===undefined||v===''||Number.isNaN(v)||(typeo
 function parseHlt(s){const p=new Set();(s.match(/\d+/g)||[]).forEach(n=>p.add(+n));return p;}
 
 // ── CSV parsers ───────────────────────────────────────────────────────────────
+function parseCsvLine(line){
+  const r=[]; let cur='', inQ=false;
+  for(const ch of line){
+    if(ch==='"'){inQ=!inQ;}
+    else if(ch===','&&!inQ){r.push(cur);cur='';}
+    else cur+=ch;
+  }
+  r.push(cur);
+  return r;
+}
+  
 function pmut(s){
   const lines=s.trim().split('\n');
   if(lines.length<2)return[];
@@ -229,14 +240,14 @@ function pmut(s){
   const aasIdx  = hdr.indexOf('max_activity_aas');
   const r=[];
   for(const l of lines.slice(1)){
-    const p=l.split(',');
+    const p=parseCsvLine(l);
     const pos=+(p[posIdx]?.trim());
     if(isNaN(pos))continue;
     const res      = p[resIdx]?.trim()??'';
     const num      = isND(p[numIdx]?.trim())  ? null : +(p[numIdx].trim());
     const entropy  = isND(p[entrIdx]?.trim()) ? null : +(p[entrIdx]?.trim());
     const activity = isND(p[actIdx]?.trim())  ? null : +(p[actIdx]?.trim());
-    const aas      = aasIdx>=0 ? (p[aasIdx]?.trim()||null) : null;
+    const aas = aasIdx>=0 ? (p[aasIdx]?.trim().replace(/^"|"$/g,'')||null) : null;
     r.push({pos,res,num,entropy,activity,aas});
   }
   return r;
