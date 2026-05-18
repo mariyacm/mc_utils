@@ -62,13 +62,14 @@
   .update-btn { font-family: var(--mono); font-size: 11px; font-weight: 600; padding: 8px 14px; border: none; border-radius: 6px; background: var(--text); color: var(--bg); cursor: pointer; width: 100%; letter-spacing: .04em; transition: background .15s; margin-top: 2px; }
   .update-btn:hover { background: var(--accent); }
   #vizpanel { padding: 24px 24px 24px 28px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-  #tooltip-bar { font-family: var(--mono); font-size: 12px; color: var(--accent); height: 18px; letter-spacing: .02em; }
+  #tooltip-bar { font-family: var(--mono); font-size: 12px; color: var(--text); height: 18px; letter-spacing: .02em; }
   #svgwrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
   #loading { font-family: var(--mono); font-size: 11px; color: var(--text-lo); padding: 40px; text-align: center; }
   #sv { display: none; }
   .arc { fill: none; cursor: pointer; stroke: #8A8880; stroke-width: .8; opacity: .45; transition: opacity .1s, stroke-width .1s; }
-  .arc.hi  { opacity: .92; stroke-width: 2; stroke: var(--accent); }
+  .arc.hi  { opacity: .92; stroke-width: 2; stroke: #1A1916; }
   .arc.dim { opacity: .04; }
+  .arc.pinned { opacity: .85; stroke-width: 1.8; stroke: #1A1916; }
   .pill { cursor: pointer; }
   footer { border-top: 1px solid var(--border); padding: 10px 32px; font-family: var(--mono); font-size: 10px; color: var(--text-lo); display: flex; gap: 16px; background: var(--surface); }
   @media (max-width: 800px) {
@@ -80,7 +81,7 @@
 <body>
 <header>
   <h1>NucB · Mutational Coverage</h1>
-  <p>Arc diagram — coverage × contacts × secondary structure</p>
+  <p>Arc diagram — coverage × contacts × secondary structure · Cβ–Cβ 8 Å</p>
   <span class="badge">mc_utils</span>
 </header>
 <main>
@@ -111,7 +112,7 @@
     <div>
       <div class="section-label">Residues of interest</div>
       <input type="text" class="hlt-input" id="ihlt" placeholder="N71, C88, D102" oninput="render()">
-      <div class="hlt-hint">Comma-separated. Accepts labels (N71) or plain positions.</div>
+      <div class="hlt-hint">Comma-separated. Accepts labels (N71) or plain positions. Click any pill to pin/unpin its contacts.</div>
     </div>
     <div>
       <div class="section-label">Legend</div>
@@ -202,7 +203,7 @@ function loadFile(input, textareaId, statusId){
 
 // ── Color scales ──────────────────────────────────────────────────────────────
 const SC={
-  'White → Purple': {lo:[252,251,253],hi:[160,130,210]},  // softer purple
+  'White → Purple': {lo:[252,251,253],hi:[160,130,210]},
   'White → Red':    {lo:[255,245,245],hi:[180,20,20]},
   'White → Blue':   {lo:[245,248,255],hi:[20,60,180]},
   'Gray → Red':     {lo:[212,210,200],hi:[216,90,48]},
@@ -215,6 +216,18 @@ function tc(lo,hi,t){
 }
 function isND(v){return v===null||v===undefined||v===''||Number.isNaN(v)||(typeof v==='string'&&v.trim().toLowerCase()==='nan');}
 function parseHlt(s){const p=new Set();(s.match(/\d+/g)||[]).forEach(n=>p.add(+n));return p;}
+
+// ── CSV line parser (handles quoted fields) ───────────────────────────────────
+function parseCsvLine(line){
+  const r=[]; let cur='', inQ=false;
+  for(const ch of line){
+    if(ch==='"'){inQ=!inQ;}
+    else if(ch===','&&!inQ){r.push(cur);cur='';}
+    else cur+=ch;
+  }
+  r.push(cur);
+  return r;
+}
 
 // ── CSV parsers ───────────────────────────────────────────────────────────────
 function parseCsvLine(line){
@@ -284,6 +297,21 @@ function assignHeights(cons,xf){
   return arcs;
 }
 
+// ── Pinned contacts state ─────────────────────────────────────────────────────
+let pinned = new Set();
+
+function applyPinned(){
+  if(pinned.size===0){ clrArcs(); return; }
+  document.querySelectorAll('#sv .arc').forEach(a=>{
+    const a1=+a.dataset.a, a2=+a.dataset.b;
+    if([...pinned].some(p=>p===a1||p===a2)){
+      a.classList.add('hi'); a.classList.remove('dim','pinned');
+    } else {
+      a.classList.remove('hi'); a.classList.add('dim');
+    }
+  });
+}
+
 // ── Main render ───────────────────────────────────────────────────────────────
 function render(){
   const muts     = pmut(document.getElementById('imut').value);
@@ -314,20 +342,15 @@ function render(){
   const maxActivity = hasActivity ? Math.max(...muts.map(d=>d.activity??0)) : 1;
 
   const ML=20,MR=30,PW=10,PH=38;
-  const AA_FONT    = 7;
-  const AA_LINE_H  = 8;   // px per AA letter line
-
-  // Pre-calculate max AA lines needed for vertical layout
-  const maxAAsLines = (showAAs && hasAAs)
-    ? Math.max(...muts.map(d=>(d.aas?d.aas.split(',').length:0)))
-    : 0;
-  const AA_BLOCK_H = maxAAsLines * AA_LINE_H;
-  const AA_GAP     = AA_BLOCK_H > 0 ? 3 : 0;
-
-  const EBAR_MAX   = showEntr && hasEntropy ? 20 : 0;
-  const EBAR_GAP   = EBAR_MAX > 0 ? 4 : 0;
+  const AA_FONT   = 7;
+  const AA_LINE_H = 8;
+  const maxAAsLines = (showAAs&&hasAAs) ? Math.max(...muts.map(d=>(d.aas?d.aas.split(',').length:0))) : 0;
+  const AA_BLOCK_H = maxAAsLines*AA_LINE_H;
+  const AA_GAP     = AA_BLOCK_H>0?3:0;
+  const EBAR_MAX   = showEntr&&hasEntropy?20:0;
+  const EBAR_GAP   = EBAR_MAX>0?4:0;
   const DOT_R      = 3.5;
-  const DOT_GAP    = showAct && hasActivity ? DOT_R*2+3 : 0;
+  const DOT_GAP    = showAct&&hasActivity?DOT_R*2+3:0;
 
   const avail = Math.max(700,document.getElementById('vizpanel').clientWidth-52);
   const SP    = Math.max(13,Math.min(22,(avail-ML-MR)/n));
@@ -338,33 +361,29 @@ function render(){
   const maxAH   = arcData.length?Math.max(...arcData.map(a=>a.ah)):0;
 
   const ARC_MARGIN = 20;
-  const BY        = maxAH + ARC_MARGIN + DOT_GAP + PH/2;
-  const PT        = BY - PH/2;
-  const PB        = BY + PH/2;
-  const AA_TOP    = PB + AA_GAP;
-  const EBAR_TOP  = AA_TOP + AA_BLOCK_H + (AA_BLOCK_H>0?3:0) + EBAR_GAP;
-  const SS_TOP    = EBAR_TOP + EBAR_MAX + (EBAR_MAX>0?4:0);
-  const SS_H      = 14;
-  const TICK_Y    = SS_TOP + SS_H + 3;
-  const LABY      = TICK_Y + 13;
-  const SVG_H     = LABY + 11;
+  const BY     = maxAH+ARC_MARGIN+DOT_GAP+PH/2;
+  const PT     = BY-PH/2;
+  const PB     = BY+PH/2;
+  const AA_TOP = PB+AA_GAP;
+  const EBAR_TOP = AA_TOP+AA_BLOCK_H+(AA_BLOCK_H>0?3:0)+EBAR_GAP;
+  const SS_TOP   = EBAR_TOP+EBAR_MAX+(EBAR_MAX>0?4:0);
+  const SS_H     = 14;
+  const TICK_Y   = SS_TOP+SS_H+3;
+  const LABY     = TICK_Y+13;
+  const SVG_H    = LABY+11;
 
   const cov = Object.fromEntries(muts.map(d=>[d.pos,d]));
   const did = 'nd'+Date.now();
 
   let h=`<defs><pattern id="${did}" patternUnits="userSpaceOnUse" width="5" height="5" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="5" stroke="#C8C6BE" stroke-width="2"/></pattern></defs>`;
-
-  // backbone
   h+=`<line x1="${xf(1).toFixed(1)}" y1="${BY}" x2="${xf(n).toFixed(1)}" y2="${BY}" stroke="#D8D6CC" stroke-width=".6"/>`;
 
-  // ticks
   for(let i=10;i<=n;i+=10){
     const cx=xf(i).toFixed(1);
     h+=`<line x1="${cx}" y1="${TICK_Y}" x2="${cx}" y2="${TICK_Y+4}" stroke="#BFBCAC" stroke-width=".5"/>`;
     h+=`<text x="${cx}" y="${LABY}" text-anchor="middle" font-size="9" fill="#BFBCAC" font-family="JetBrains Mono,monospace">${i}</text>`;
   }
 
-  // secondary structure
   if(showSS){
     for(const s of ss){
       const xs=xf(s.start)-PW/2,xe=xf(s.end)+PW/2,w=xe-xs,mx=(xs+xe)/2;
@@ -380,53 +399,45 @@ function render(){
     }
   }
 
-  // arcs
   for(const arc of arcData){
     const{xa,xb,ah,a,b}=arc;
     const top=(PT-DOT_GAP-ah).toFixed(1);
     h+=`<path class="arc" data-a="${a}" data-b="${b}" d="M${xa.toFixed(1)},${PT} C${xa.toFixed(1)},${top} ${xb.toFixed(1)},${top} ${xb.toFixed(1)},${PT}"/>`;
   }
 
-  // pills + AA labels + entropy bars + activity dots
   for(let i=1;i<=n;i++){
-    const cx  = xf(i);
-    const e   = cov[i]||{num:null,res:'',entropy:null,activity:null,aas:null};
-    const nd  = isND(e.num);
-    const t   = nd?0:(maxAA>minAA?(e.num-minAA)/(maxAA-minAA):0.5);
-    const fill    = nd?`url(#${did})`:c3(scale.lo,scale.hi,t);
-    const bgfill  = nd?'#E8E6DE':fill;
-    const txtc    = nd?'rgba(0,0,0,.4)':tc(scale.lo,scale.hi,t);
-    const label   = e.res?`${e.res}${i}`:String(i);
-    const isHlt   = hlts.has(i);
+    const cx=xf(i);
+    const e=cov[i]||{num:null,res:'',entropy:null,activity:null,aas:null};
+    const nd=isND(e.num);
+    const t=nd?0:(maxAA>minAA?(e.num-minAA)/(maxAA-minAA):0.5);
+    const fill=nd?`url(#${did})`:c3(scale.lo,scale.hi,t);
+    const bgfill=nd?'#E8E6DE':fill;
+    const txtc=nd?'rgba(0,0,0,.4)':tc(scale.lo,scale.hi,t);
+    const label=e.res?`${e.res}${i}`:String(i);
+    const isHlt=hlts.has(i);
 
     h+=`<g class="pill" data-pos="${i}" data-num="${nd?'—':e.num}" data-res="${e.res}" data-entropy="${e.entropy??''}" data-activity="${e.activity??''}" data-aas="${e.aas??''}" data-nd="${nd}">`;
-
-    // pill rect (bg for nodata pattern)
     h+=`<rect x="${(cx-PW/2).toFixed(1)}" y="${PT}" width="${PW}" height="${PH}" rx="4" fill="${bgfill}" stroke="${isHlt?'#111':(nd?'#AAA8A0':'rgba(0,0,0,.14)')}" stroke-width="${isHlt?'2':(nd?'.8':'.5')}" stroke-dasharray="${nd&&!isHlt?'3,2':'none'}"/>`;
     if(!nd){
       h+=`<rect x="${(cx-PW/2).toFixed(1)}" y="${PT}" width="${PW}" height="${PH}" rx="4" fill="${fill}" stroke="${isHlt?'#111':'rgba(0,0,0,.14)'}" stroke-width="${isHlt?'2':'.5'}"/>`;
     }
-    // label
     h+=`<text transform="rotate(-90,${cx.toFixed(1)},${BY})" x="${cx.toFixed(1)}" y="${BY+.5}" text-anchor="middle" dominant-baseline="central" font-size="8.5" fill="${txtc}" font-family="JetBrains Mono,monospace">${label}</text>`;
 
-    // best-activity AA letters (below pill, one per line)
-    if(showAAs && hasAAs && e.aas && e.aas!==''){
+    if(showAAs&&hasAAs&&e.aas&&e.aas!==''){
       const letters=e.aas.split(',');
       letters.forEach((aa,li)=>{
-        const y=AA_TOP + li*AA_LINE_H + AA_FONT;
+        const y=AA_TOP+li*AA_LINE_H+AA_FONT;
         h+=`<text x="${cx.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" font-size="${AA_FONT}" font-weight="600" fill="#2E8B3A" font-family="JetBrains Mono,monospace">${aa.trim()}</text>`;
       });
     }
 
-    // entropy bar
-    if(showEntr && hasEntropy && e.entropy!==null && EBAR_MAX>0){
+    if(showEntr&&hasEntropy&&e.entropy!==null&&EBAR_MAX>0){
       const barH=Math.max(1,(e.entropy/maxEntropy)*EBAR_MAX);
       const barY=EBAR_TOP+EBAR_MAX-barH;
       h+=`<rect x="${(cx-PW/2+1).toFixed(1)}" y="${barY.toFixed(1)}" width="${PW-2}" height="${barH.toFixed(1)}" rx="1" fill="#B5D4F4" opacity=".85"/>`;
     }
 
-    // activity dot (above pill)
-    if(showAct && hasActivity && e.activity!==null && e.activity>=actThresh){
+    if(showAct&&hasActivity&&e.activity!==null&&e.activity>=actThresh){
       const dotR=DOT_R*(e.activity/maxActivity);
       const dotY=PT-dotR-2;
       h+=`<circle cx="${cx.toFixed(1)}" cy="${dotY.toFixed(1)}" r="${dotR.toFixed(1)}" fill="#2E8B3A" opacity=".9"/>`;
@@ -442,7 +453,10 @@ function render(){
   sv.innerHTML=h;
   drawLeg(scale,minAA,maxAA);
   document.getElementById('tooltip-bar').textContent='';
-  clrArcs();
+
+  // Auto-pin residues of interest
+  pinned=new Set([...hlts]);
+  applyPinned();
 }
 
 function drawLeg(sc,mn,mx){
@@ -452,7 +466,23 @@ function drawLeg(sc,mn,mx){
   document.getElementById('leg-min').textContent=fmt(mn);
   document.getElementById('leg-max').textContent=fmt(mx);
 }
-function clrArcs(){document.querySelectorAll('#sv .arc').forEach(a=>a.classList.remove('hi','dim'));}
+function clrArcs(){document.querySelectorAll('#sv .arc').forEach(a=>a.classList.remove('hi','dim','pinned'));}
+
+// ── Interaction: hover + click-to-pin ────────────────────────────────────────
+document.getElementById('sv').addEventListener('click',e=>{
+  const pill=e.target.closest('.pill');
+  if(pill){
+    const pos=+pill.dataset.pos;
+    if(pinned.has(pos)) pinned.delete(pos);
+    else pinned.add(pos);
+    applyPinned();
+  } else if(!e.target.closest('.arc')){
+    // clicking empty space clears manual pins but keeps residues-of-interest pins
+    const hlts=parseHlt(document.getElementById('ihlt').value);
+    pinned=new Set([...hlts]);
+    applyPinned();
+  }
+});
 
 document.getElementById('sv').addEventListener('mouseover',e=>{
   const pill=e.target.closest('.pill');
@@ -466,18 +496,24 @@ document.getElementById('sv').addEventListener('mouseover',e=>{
     if(act&&!isND(+act))   tip+=`  ·  max_act=${(+act).toFixed(2)}`;
     if(aas)                tip+=`  ·  best AAs: ${aas}`;
     document.getElementById('tooltip-bar').textContent=tip;
-    let found=false;
-    document.querySelectorAll('#sv .arc').forEach(a=>{
-      if(+a.dataset.a===p||+a.dataset.b===p){a.classList.add('hi');a.classList.remove('dim');found=true;}
-      else a.classList.add('dim');
-    });
-    if(!found)clrArcs();
-  }else if(arc){
+    // only show hover highlight if nothing is pinned
+    if(pinned.size===0){
+      document.querySelectorAll('#sv .arc').forEach(a=>{
+        if(+a.dataset.a===p||+a.dataset.b===p){a.classList.add('hi');a.classList.remove('dim');}
+        else a.classList.add('dim');
+      });
+    }
+  } else if(arc){
     document.getElementById('tooltip-bar').textContent=`Contact ${arc.dataset.a}–${arc.dataset.b}  ·  Δ${arc.dataset.b-arc.dataset.a} residues`;
   }
 });
+
 document.getElementById('sv').addEventListener('mouseout',e=>{
-  if(!e.relatedTarget?.closest('#sv')){clrArcs();document.getElementById('tooltip-bar').textContent='';}
+  if(!e.relatedTarget?.closest('#sv')){
+    document.getElementById('tooltip-bar').textContent='';
+    if(pinned.size===0) clrArcs();
+    else applyPinned();
+  }
 });
 
 // ── Auto-load default data from repo ─────────────────────────────────────────
