@@ -44,8 +44,7 @@
   .swatch { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; border: 1px solid transparent; }
   .swatch.helix  { background: #E0EAFB; border-color: var(--blue); }
   .swatch.strand { background: #E6F2DC; border-color: var(--green); }
-  .swatch.turn   { background: #F5ECD7; border-color: #C8A050; }
-  .swatch.loop   { width: 14px; height: 2px; background: #BFBCAC; border: none; border-radius: 1px; margin: 6px 0; }
+  .swatch.loop   { width: 14px; height: 2px; background: #CCCAB8; border: none; border-radius: 1px; margin: 6px 0; }
   .swatch.hlt    { background: #D3D1C7; border: 2px solid #111; }
   .swatch.nodata { background: #E8E6DE; border: 1px dashed #AAA8A0; }
   .swatch.dot    { width: 9px; height: 9px; border-radius: 50%; background: #2E8B3A; border: none; flex-shrink: 0; }
@@ -140,8 +139,7 @@
         </div>
         <div class="legend-row"><span class="swatch helix"></span> α helix</div>
         <div class="legend-row"><span class="swatch strand"></span> β strand</div>
-        <div class="legend-row"><span class="swatch turn"></span> Turn</div>
-        <div class="legend-row"><span class="swatch loop"></span> Loop</div>
+        <div class="legend-row"><span class="swatch loop"></span> Loop / turn</div>
         <div class="legend-row"><span class="swatch hlt"></span> Residue of interest</div>
         <div class="legend-row"><span class="swatch nodata"></span> No data</div>
         <hr class="legend-divider">
@@ -214,8 +212,8 @@
 
 <script>
 const CONTACT_COLORS={
-  salt_bridge:'#D85A30', hbond:'#2E8B3A', hydrophobic:'#8B5E3C',
-  aromatic:'#7B5EA7', polar:'#5BA3C9', other:'#BFBCAC',
+  salt_bridge:'#D85A30',hbond:'#2E8B3A',hydrophobic:'#8B5E3C',
+  aromatic:'#7B5EA7',polar:'#5BA3C9',other:'#BFBCAC',
 };
 const UNIFORM_ARC_COLOR='#8A8880';
 const AA_COLORS={
@@ -267,8 +265,8 @@ function parseCsvLine(line){
 function pmut(s){
   const lines=s.trim().split('\n'); if(lines.length<2)return[];
   const hdr=lines[0].split(',').map(h=>h.trim().toLowerCase());
-  const posIdx=hdr.indexOf('position'), resIdx=hdr.indexOf('residue'),
-        numIdx=hdr.indexOf('num_aa'), entrIdx=hdr.indexOf('entropy'),
+  const posIdx=hdr.indexOf('position'),resIdx=hdr.indexOf('residue'),
+        numIdx=hdr.indexOf('num_aa'),entrIdx=hdr.indexOf('entropy'),
         actIdx=hdr.findIndex(h=>h==='max_activity'||h==='mean_activity'),
         aasIdx=hdr.indexOf('max_activity_aas');
   const r=[];
@@ -276,8 +274,8 @@ function pmut(s){
     const p=parseCsvLine(l);
     const pos=+(p[posIdx]?.trim()); if(isNaN(pos))continue;
     r.push({
-      pos, res:p[resIdx]?.trim()??'',
-      num:   isND(p[numIdx]?.trim())  ?null:+(p[numIdx].trim()),
+      pos,res:p[resIdx]?.trim()??'',
+      num:    isND(p[numIdx]?.trim())  ?null:+(p[numIdx].trim()),
       entropy:isND(p[entrIdx]?.trim())?null:+(p[entrIdx]?.trim()),
       activity:isND(p[actIdx]?.trim())?null:+(p[actIdx]?.trim()),
       aas:aasIdx>=0?(p[aasIdx]?.trim()||null):null,
@@ -305,8 +303,7 @@ function pss(s){
   const hdr=lines[0].split(',').map(h=>h.trim().toLowerCase());
   const ti=hdr.indexOf('type'),si=hdr.indexOf('start'),ei=hdr.indexOf('end');
   return lines.slice(1).map(l=>{
-    const p=l.split(',');
-    if(p.length<3)return null;
+    const p=l.split(','); if(p.length<3)return null;
     return{type:p[ti>=0?ti:0].trim(),start:+p[si>=0?si:1],end:+p[ei>=0?ei:2]};
   }).filter(x=>x&&x.type&&!isNaN(x.start)&&!isNaN(x.end));
 }
@@ -366,7 +363,7 @@ function render(){
   const maxActivity=hasActivity?Math.max(...muts.map(d=>d.activity??0)):1;
 
   const ML=20,MR=30,PW=10,PH=38;
-  const AA_FONT=9, AA_LINE_H=10;
+  const AA_FONT=9,AA_LINE_H=10;
   const maxAAsLines=(showAAs&&hasAAs)?Math.max(...muts.map(d=>(d.aas?d.aas.split(',').length:0))):0;
   const AA_BLOCK_H=maxAAsLines*AA_LINE_H;
   const AA_GAP=AA_BLOCK_H>0?3:0;
@@ -391,57 +388,45 @@ function render(){
   const AA_TOP=PB+AA_GAP;
   const EBAR_TOP=AA_TOP+AA_BLOCK_H+(AA_BLOCK_H>0?3:0)+EBAR_GAP;
   const SS_TOP  =EBAR_TOP+EBAR_MAX+(EBAR_MAX>0?4:0);
+  const SS_MID  =SS_TOP+SS_H/2;
   const TICK_Y  =SS_TOP+SS_H+3;
   const LABY    =TICK_Y+13;
   const SVG_H   =LABY+11;
-  const SS_MID  =SS_TOP+SS_H/2;  // vertical center of SS panel
 
   const cov=Object.fromEntries(muts.map(d=>[d.pos,d]));
   const did='nd'+Date.now();
 
   let h=`<defs><pattern id="${did}" patternUnits="userSpaceOnUse" width="5" height="5" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="5" stroke="#C8C6BE" stroke-width="2"/></pattern></defs>`;
-
-  // backbone spine
   h+=`<line x1="${xf(1).toFixed(1)}" y1="${BY}" x2="${xf(n).toFixed(1)}" y2="${BY}" stroke="#D8D6CC" stroke-width=".6"/>`;
 
-  // ticks
   for(let i=10;i<=n;i+=10){
     const cx=xf(i).toFixed(1);
     h+=`<line x1="${cx}" y1="${TICK_Y}" x2="${cx}" y2="${TICK_Y+4}" stroke="#BFBCAC" stroke-width=".5"/>`;
     h+=`<text x="${cx}" y="${LABY}" text-anchor="middle" font-size="9" fill="#BFBCAC" font-family="JetBrains Mono,monospace">${i}</text>`;
   }
 
-  // secondary structure
-  if(showSS && ss.length>0){
-    // Step 1: draw thin loop backbone line across the full SS panel
-    const allStarts=[...ss.map(s=>s.start)];
-    const allEnds  =[...ss.map(s=>s.end)];
-    const ssMin=Math.min(...allStarts);
-    const ssMax=Math.max(...allEnds);
+  if(showSS&&ss.length>0){
+    // Full-width loop backbone line
+    const ssMin=Math.min(...ss.map(s=>s.start));
+    const ssMax=Math.max(...ss.map(s=>s.end));
     h+=`<line x1="${(xf(ssMin)-PW/2).toFixed(1)}" y1="${SS_MID.toFixed(1)}" x2="${(xf(ssMax)+PW/2).toFixed(1)}" y2="${SS_MID.toFixed(1)}" stroke="#CCCAB8" stroke-width=".8"/>`;
 
-    // Step 2: draw SS elements on top
+    // Helix and sheet on top — turns and loops are just the line
     for(const s of ss){
-      const xs=xf(s.start)-PW/2, xe=xf(s.end)+PW/2, w=xe-xs, mx=(xs+xe)/2;
+      const xs=xf(s.start)-PW/2,xe=xf(s.end)+PW/2,w=xe-xs,mx=(xs+xe)/2;
       if(s.type==='helix'){
         h+=`<rect x="${xs.toFixed(1)}" y="${SS_TOP}" width="${w.toFixed(1)}" height="${SS_H}" rx="3" fill="#E0EAFB" stroke="#3A7AC8" stroke-width=".5"/>`;
-        h+=`<text x="${mx.toFixed(1)}" y="${SS_MID+1}" text-anchor="middle" dominant-baseline="central" font-size="9" font-weight="500" fill="#0C447C" font-family="DM Sans,sans-serif">α</text>`;
-      } else if(s.type==='sheet'){
+        h+=`<text x="${mx.toFixed(1)}" y="${(SS_MID+1).toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="9" font-weight="500" fill="#0C447C" font-family="DM Sans,sans-serif">α</text>`;
+      }else if(s.type==='sheet'){
         const tip=Math.min(10,w/4),bx2=xe-tip,ym=SS_MID;
         const pts=`${xs.toFixed(1)},${(SS_TOP+3).toFixed(1)} ${bx2.toFixed(1)},${(SS_TOP+3).toFixed(1)} ${bx2.toFixed(1)},${SS_TOP.toFixed(1)} ${xe.toFixed(1)},${ym.toFixed(1)} ${bx2.toFixed(1)},${(SS_TOP+SS_H).toFixed(1)} ${bx2.toFixed(1)},${(SS_TOP+SS_H-3).toFixed(1)} ${xs.toFixed(1)},${(SS_TOP+SS_H-3).toFixed(1)}`;
         h+=`<polygon points="${pts}" fill="#E6F2DC" stroke="#4E8A1A" stroke-width=".5"/>`;
         h+=`<text x="${((xs+bx2)/2).toFixed(1)}" y="${(ym+1).toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="9" font-weight="500" fill="#27500A" font-family="DM Sans,sans-serif">β</text>`;
-      } else if(s.type==='turn'){
-        // Small rounded bump above the loop line
-        const bump=SS_H*0.6;
-        const bmx=mx.toFixed(1), btop=(SS_TOP+SS_H/2-bump).toFixed(1);
-        h+=`<path d="M${xs.toFixed(1)},${SS_MID.toFixed(1)} C${xs.toFixed(1)},${btop} ${xe.toFixed(1)},${btop} ${xe.toFixed(1)},${SS_MID.toFixed(1)}" fill="#F5ECD7" stroke="#C8A050" stroke-width=".7"/>`;
       }
-      // loops are just the backbone line — no annotation drawn
+      // turns and loops → no annotation, just the backbone line
     }
   }
 
-  // arcs
   for(const arc of arcData){
     const{xa,xb,ah,a,b,ct}=arc;
     const top=(PT-DOT_GAP-ah).toFixed(1);
@@ -449,7 +434,6 @@ function render(){
     h+=`<path class="arc" data-a="${a}" data-b="${b}" data-ct="${ct||'other'}" style="stroke:${strokeColor}" d="M${xa.toFixed(1)},${PT} C${xa.toFixed(1)},${top} ${xb.toFixed(1)},${top} ${xb.toFixed(1)},${PT}"/>`;
   }
 
-  // pills
   for(let i=1;i<=n;i++){
     const cx=xf(i);
     const e=cov[i]||{num:null,res:'',entropy:null,activity:null,aas:null};
@@ -494,9 +478,7 @@ function render(){
   }
 
   const sv=document.getElementById('sv');
-  sv.setAttribute('width',W);
-  sv.setAttribute('viewBox',`0 0 ${W} ${SVG_H}`);
-  sv.setAttribute('height',SVG_H);
+  sv.setAttribute('width',W);sv.setAttribute('viewBox',`0 0 ${W} ${SVG_H}`);sv.setAttribute('height',SVG_H);
   sv.innerHTML=h;
   drawLeg(scale,minAA,maxAA);
   document.getElementById('tooltip-bar').textContent='';
@@ -576,7 +558,6 @@ async function loadDefaults(){
       s.style.color='var(--text-lo)';
     }
   }));
-
   try{
     const r=await fetch('./data/contacts_meta.csv');
     if(r.ok){
@@ -593,7 +574,6 @@ async function loadDefaults(){
       }
     }
   }catch{}
-
   render();
 }
 
