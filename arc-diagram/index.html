@@ -69,7 +69,7 @@
   #loading { font-family: var(--mono); font-size: 11px; color: var(--text-lo); padding: 40px; text-align: center; }
   #sv { display: none; }
   .arc { fill: none; cursor: pointer; stroke-width: .8; opacity: .5; transition: opacity .1s, stroke-width .1s; }
-  .arc.hi  { opacity: .92; stroke-width: 2.2; }
+  .arc.hi  { opacity: .8; stroke-width: 1.6; }
   .arc.dim { opacity: .04; }
   .pill { cursor: pointer; }
   footer { border-top: 1px solid var(--border); padding: 10px 32px; font-family: var(--mono); font-size: 10px; color: var(--text-lo); display: flex; gap: 16px; background: var(--surface); }
@@ -425,7 +425,7 @@ function render(){
   const maxActivity = hasActivity ? Math.max(...muts.map(d=>d.activity??0)) : 1;
 
   const ML=20,MR=30,PW=10,PH=38;
-  const AA_FONT   = 7;
+  const AA_FONT   = 9;
   const AA_LINE_H = 8;
   const maxAAsLines = (showAAs&&hasAAs)?Math.max(...muts.map(d=>(d.aas?d.aas.split(',').length:0))):0;
   const AA_BLOCK_H = maxAAsLines*AA_LINE_H;
