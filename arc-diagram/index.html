@@ -27,7 +27,7 @@
   header p  { font-size: 12px; color: var(--text-lo); font-weight: 300; }
   .badge { margin-left: auto; font-family: var(--mono); font-size: 10px; padding: 3px 8px; border: 1px solid var(--border); border-radius: 99px; color: var(--text-mid); background: var(--bg); }
   main { display: grid; grid-template-columns: 260px 1fr; }
-  aside { border-right: 1px solid var(--border); padding: 20px 18px; min-height: calc(100vh - 53px); background: var(--surface); display: flex; flex-direction: column; gap: 20px; }
+  aside { border-right: 1px solid var(--border); padding: 20px 18px; min-height: calc(100vh - 53px); background: var(--surface); display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
   .section-label { font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text-lo); margin-bottom: 8px; }
   label.row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-mid); cursor: pointer; padding: 4px 0; user-select: none; }
   label.row input[type=checkbox] { accent-color: var(--accent); width: 14px; height: 14px; }
@@ -38,8 +38,8 @@
   .hlt-hint { font-size: 10px; color: var(--text-lo); margin-top: 4px; line-height: 1.5; }
   .num-input { font-family: var(--mono); font-size: 11px; width: 70px; padding: 5px 7px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg); color: var(--text); margin-top: 4px; }
   .num-input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
-  .legend { display: flex; flex-direction: column; gap: 6px; }
-  .legend-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-mid); }
+  .legend { display: flex; flex-direction: column; gap: 5px; }
+  .legend-row { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-mid); }
   canvas#leg { border-radius: 3px; vertical-align: middle; border: 1px solid var(--border); }
   .swatch { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; border: 1px solid transparent; }
   .swatch.helix  { background: #E0EAFB; border-color: var(--blue); }
@@ -48,6 +48,8 @@
   .swatch.nodata { background: #E8E6DE; border: 1px dashed #AAA8A0; }
   .swatch.dot    { width: 9px; height: 9px; border-radius: 50%; background: #2E8B3A; border: none; flex-shrink: 0; }
   .swatch.ebar   { width: 8px; height: 14px; background: #B5D4F4; border: .5px solid #3A7AC8; border-radius: 2px; flex-shrink: 0; }
+  .arc-swatch    { width: 22px; height: 10px; flex-shrink: 0; }
+  .legend-divider { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
   .editor-grid { display: flex; flex-direction: column; gap: 12px; }
   .editor-block { display: flex; flex-direction: column; gap: 4px; }
   .editor-block .col-label { font-family: var(--mono); font-size: 10px; color: var(--text-lo); }
@@ -66,10 +68,9 @@
   #svgwrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
   #loading { font-family: var(--mono); font-size: 11px; color: var(--text-lo); padding: 40px; text-align: center; }
   #sv { display: none; }
-  .arc { fill: none; cursor: pointer; stroke: #8A8880; stroke-width: .8; opacity: .45; transition: opacity .1s, stroke-width .1s; }
-  .arc.hi  { opacity: .92; stroke-width: 2; stroke: #1A1916; }
+  .arc { fill: none; cursor: pointer; stroke-width: .8; opacity: .5; transition: opacity .1s, stroke-width .1s; }
+  .arc.hi  { opacity: .92; stroke-width: 2.2; }
   .arc.dim { opacity: .04; }
-  .arc.pinned { opacity: .85; stroke-width: 1.8; stroke: #1A1916; }
   .pill { cursor: pointer; }
   footer { border-top: 1px solid var(--border); padding: 10px 32px; font-family: var(--mono); font-size: 10px; color: var(--text-lo); display: flex; gap: 16px; background: var(--surface); }
   @media (max-width: 800px) {
@@ -81,7 +82,7 @@
 <body>
 <header>
   <h1>NucB · Mutational Coverage</h1>
-  <p>Arc diagram — coverage × contacts × secondary structure · Cβ–Cβ 8 Å</p>
+  <p id="header-sub">Arc diagram — coverage × contacts × secondary structure</p>
   <span class="badge">mc_utils</span>
 </header>
 <main>
@@ -95,7 +96,14 @@
       <label class="row"><input type="checkbox" id="caas" checked onchange="render()"> Best-activity AAs</label>
     </div>
     <div>
-      <div class="section-label">Color scale</div>
+      <div class="section-label">Contact coloring</div>
+      <select id="arcmode" onchange="render()">
+        <option value="type">By interaction type</option>
+        <option value="uniform">Uniform</option>
+      </select>
+    </div>
+    <div>
+      <div class="section-label">Bead color scale</div>
       <select id="cscl" onchange="render()">
         <option>White → Purple</option>
         <option>White → Red</option>
@@ -122,10 +130,6 @@
           <canvas id="leg" width="70" height="10"></canvas>
           <span id="leg-max" style="font-family:var(--mono);font-size:10px;color:var(--text-lo)">20</span>
         </div>
-        <div class="legend-row">
-          <svg width="22" height="14" style="vertical-align:middle"><path d="M2,13 C2,2 20,2 20,13" fill="none" stroke="#8A8880" stroke-width=".9"/></svg>
-          Contact
-        </div>
         <div class="legend-row"><span class="swatch ebar"></span> Shannon entropy</div>
         <div class="legend-row"><span class="swatch dot"></span> Active position</div>
         <div class="legend-row">
@@ -136,6 +140,55 @@
         <div class="legend-row"><span class="swatch strand"></span> β strand</div>
         <div class="legend-row"><span class="swatch hlt"></span> Residue of interest</div>
         <div class="legend-row"><span class="swatch nodata"></span> No data</div>
+        <hr class="legend-divider">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text-lo);margin-bottom:2px">CONTACTS</div>
+        <div class="legend-row">
+          <svg class="arc-swatch"><path d="M2,9 C2,2 20,2 20,9" fill="none" stroke="#D85A30" stroke-width="1.5"/></svg>
+          Salt bridge
+        </div>
+        <div class="legend-row">
+          <svg class="arc-swatch"><path d="M2,9 C2,2 20,2 20,9" fill="none" stroke="#2E8B3A" stroke-width="1.5"/></svg>
+          H-bond
+        </div>
+        <div class="legend-row">
+          <svg class="arc-swatch"><path d="M2,9 C2,2 20,2 20,9" fill="none" stroke="#8B5E3C" stroke-width="1.5"/></svg>
+          Hydrophobic
+        </div>
+        <div class="legend-row">
+          <svg class="arc-swatch"><path d="M2,9 C2,2 20,2 20,9" fill="none" stroke="#7B5EA7" stroke-width="1.5"/></svg>
+          Aromatic
+        </div>
+        <div class="legend-row">
+          <svg class="arc-swatch"><path d="M2,9 C2,2 20,2 20,9" fill="none" stroke="#5BA3C9" stroke-width="1.5"/></svg>
+          Polar
+        </div>
+        <div class="legend-row">
+          <svg class="arc-swatch"><path d="M2,9 C2,2 20,2 20,9" fill="none" stroke="#BFBCAC" stroke-width="1.5"/></svg>
+          Other
+        </div>
+        <hr class="legend-divider">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text-lo);margin-bottom:2px">RESIDUE CLASS</div>
+        <div class="legend-row">
+          <span style="font-family:var(--mono);font-size:9px;font-weight:600;color:#8B5E3C">A</span> Hydrophobic
+        </div>
+        <div class="legend-row">
+          <span style="font-family:var(--mono);font-size:9px;font-weight:600;color:#5BA3C9">S</span> Polar
+        </div>
+        <div class="legend-row">
+          <span style="font-family:var(--mono);font-size:9px;font-weight:600;color:#D85A30">K</span> Charged +
+        </div>
+        <div class="legend-row">
+          <span style="font-family:var(--mono);font-size:9px;font-weight:600;color:#3A7AC8">D</span> Charged −
+        </div>
+        <div class="legend-row">
+          <span style="font-family:var(--mono);font-size:9px;font-weight:600;color:#7B5EA7">F</span> Aromatic
+        </div>
+        <div class="legend-row">
+          <span style="font-family:var(--mono);font-size:9px;font-weight:600;color:#C8A84B">C</span> Cysteine
+        </div>
+        <div class="legend-row">
+          <span style="font-family:var(--mono);font-size:9px;font-weight:600;color:#888">G</span> Glycine
+        </div>
       </div>
     </div>
     <div>
@@ -152,7 +205,7 @@
           <textarea id="imut" rows="4" placeholder="or paste CSV here..."></textarea>
         </div>
         <div class="editor-block">
-          <div class="col-label">contacts · pos1, pos2</div>
+          <div class="col-label">contacts · pos1, pos2 [,distance] [,contact_type]</div>
           <div class="upload-row">
             <button class="upload-btn" onclick="document.getElementById('f-con').click()">↑ Upload CSV</button>
             <span class="upload-status" id="s-con">loading…</span>
@@ -183,11 +236,40 @@
   </div>
 </main>
 <footer>
-  <span>NucB · Bacillus licheniformis · PDB 5OMT · Cβ–Cβ contacts 8 Å</span>
+  <span id="footer-contact-info">NucB · Bacillus licheniformis · PDB 5OMT</span>
   <span>mc_utils arc diagram</span>
 </footer>
 
 <script>
+// ── Contact type colors ───────────────────────────────────────────────────────
+const CONTACT_COLORS = {
+  salt_bridge:  '#D85A30',
+  hbond:        '#2E8B3A',
+  hydrophobic:  '#8B5E3C',
+  aromatic:     '#7B5EA7',
+  polar:        '#5BA3C9',
+  other:        '#BFBCAC',
+};
+const UNIFORM_ARC_COLOR = '#8A8880';
+
+// ── Residue class colors ──────────────────────────────────────────────────────
+const AA_COLORS = {
+  // Hydrophobic
+  A:'#8B5E3C',V:'#8B5E3C',L:'#8B5E3C',I:'#8B5E3C',M:'#8B5E3C',
+  F:'#7B5EA7',W:'#7B5EA7',P:'#8B5E3C',
+  // Polar
+  S:'#5BA3C9',T:'#5BA3C9',N:'#5BA3C9',Q:'#5BA3C9',
+  // Charged +
+  K:'#D85A30',R:'#D85A30',H:'#D85A30',
+  // Charged -
+  D:'#3A7AC8',E:'#3A7AC8',
+  // Aromatic (F,W already above as hydrophobic-aromatic)
+  Y:'#7B5EA7',
+  // Special
+  C:'#C8A84B',
+  G:'#888888',
+};
+
 // ── File upload ───────────────────────────────────────────────────────────────
 function loadFile(input, textareaId, statusId){
   const file=input.files[0]; if(!file)return;
@@ -230,17 +312,6 @@ function parseCsvLine(line){
 }
 
 // ── CSV parsers ───────────────────────────────────────────────────────────────
-function parseCsvLine(line){
-  const r=[]; let cur='', inQ=false;
-  for(const ch of line){
-    if(ch==='"'){inQ=!inQ;}
-    else if(ch===','&&!inQ){r.push(cur);cur='';}
-    else cur+=ch;
-  }
-  r.push(cur);
-  return r;
-}
-  
 function pmut(s){
   const lines=s.trim().split('\n');
   if(lines.length<2)return[];
@@ -260,19 +331,30 @@ function pmut(s){
     const num      = isND(p[numIdx]?.trim())  ? null : +(p[numIdx].trim());
     const entropy  = isND(p[entrIdx]?.trim()) ? null : +(p[entrIdx]?.trim());
     const activity = isND(p[actIdx]?.trim())  ? null : +(p[actIdx]?.trim());
-    const aas = aasIdx>=0 ? (p[aasIdx]?.trim().replace(/^"|"$/g,'')||null) : null;
+    const aas      = aasIdx>=0 ? (p[aasIdx]?.trim()||null) : null;
     r.push({pos,res,num,entropy,activity,aas});
   }
   return r;
 }
+
 function pcon(s){
+  const lines=s.trim().split('\n');
+  if(lines.length<2)return[];
+  const hdr=lines[0].split(',').map(h=>h.trim().toLowerCase());
+  const p1Idx = hdr.indexOf('pos1');
+  const p2Idx = hdr.indexOf('pos2');
+  const ctIdx = hdr.indexOf('contact_type');
   const r=[];
-  for(const l of s.trim().split('\n').slice(1)){
-    const[a,b]=l.split(',').map(Number);
-    if(!isNaN(a)&&!isNaN(b)&&a!==b)r.push({a:Math.min(a,b),b:Math.max(a,b)});
+  for(const l of lines.slice(1)){
+    const p=parseCsvLine(l);
+    const a=+(p[p1Idx]?.trim()), b=+(p[p2Idx]?.trim());
+    if(isNaN(a)||isNaN(b)||a===b)continue;
+    const ct = ctIdx>=0 ? (p[ctIdx]?.trim()||'other') : 'other';
+    r.push({a:Math.min(a,b), b:Math.max(a,b), ct});
   }
   return r;
 }
+
 function pss(s){
   return s.trim().split('\n').slice(1).map(l=>{
     const p=l.split(',');
@@ -305,7 +387,7 @@ function applyPinned(){
   document.querySelectorAll('#sv .arc').forEach(a=>{
     const a1=+a.dataset.a, a2=+a.dataset.b;
     if([...pinned].some(p=>p===a1||p===a2)){
-      a.classList.add('hi'); a.classList.remove('dim','pinned');
+      a.classList.add('hi'); a.classList.remove('dim');
     } else {
       a.classList.remove('hi'); a.classList.add('dim');
     }
@@ -323,6 +405,7 @@ function render(){
   const showEntr = document.getElementById('centr').checked;
   const showAct  = document.getElementById('cact').checked;
   const showAAs  = document.getElementById('caas').checked;
+  const arcMode  = document.getElementById('arcmode').value;
   const actThresh= +document.getElementById('actthresh').value;
   const scale    = SC[document.getElementById('cscl').value]||SC['White → Purple'];
   if(!muts.length)return;
@@ -344,7 +427,7 @@ function render(){
   const ML=20,MR=30,PW=10,PH=38;
   const AA_FONT   = 7;
   const AA_LINE_H = 8;
-  const maxAAsLines = (showAAs&&hasAAs) ? Math.max(...muts.map(d=>(d.aas?d.aas.split(',').length:0))) : 0;
+  const maxAAsLines = (showAAs&&hasAAs)?Math.max(...muts.map(d=>(d.aas?d.aas.split(',').length:0))):0;
   const AA_BLOCK_H = maxAAsLines*AA_LINE_H;
   const AA_GAP     = AA_BLOCK_H>0?3:0;
   const EBAR_MAX   = showEntr&&hasEntropy?20:0;
@@ -399,12 +482,17 @@ function render(){
     }
   }
 
+  // arcs
   for(const arc of arcData){
-    const{xa,xb,ah,a,b}=arc;
+    const{xa,xb,ah,a,b,ct}=arc;
     const top=(PT-DOT_GAP-ah).toFixed(1);
-    h+=`<path class="arc" data-a="${a}" data-b="${b}" d="M${xa.toFixed(1)},${PT} C${xa.toFixed(1)},${top} ${xb.toFixed(1)},${top} ${xb.toFixed(1)},${PT}"/>`;
+    const strokeColor = arcMode==='type'
+      ? (CONTACT_COLORS[ct]||CONTACT_COLORS.other)
+      : UNIFORM_ARC_COLOR;
+    h+=`<path class="arc" data-a="${a}" data-b="${b}" data-ct="${ct||'other'}" style="stroke:${strokeColor}" d="M${xa.toFixed(1)},${PT} C${xa.toFixed(1)},${top} ${xb.toFixed(1)},${top} ${xb.toFixed(1)},${PT}"/>`;
   }
 
+  // pills
   for(let i=1;i<=n;i++){
     const cx=xf(i);
     const e=cov[i]||{num:null,res:'',entropy:null,activity:null,aas:null};
@@ -423,11 +511,14 @@ function render(){
     }
     h+=`<text transform="rotate(-90,${cx.toFixed(1)},${BY})" x="${cx.toFixed(1)}" y="${BY+.5}" text-anchor="middle" dominant-baseline="central" font-size="8.5" fill="${txtc}" font-family="JetBrains Mono,monospace">${label}</text>`;
 
+    // best-activity AA letters — colored by residue class
     if(showAAs&&hasAAs&&e.aas&&e.aas!==''){
       const letters=e.aas.split(',');
       letters.forEach((aa,li)=>{
+        const letter=aa.trim().toUpperCase();
+        const aaColor=AA_COLORS[letter]||'#2E8B3A';
         const y=AA_TOP+li*AA_LINE_H+AA_FONT;
-        h+=`<text x="${cx.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" font-size="${AA_FONT}" font-weight="600" fill="#2E8B3A" font-family="JetBrains Mono,monospace">${aa.trim()}</text>`;
+        h+=`<text x="${cx.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" font-size="${AA_FONT}" font-weight="600" fill="${aaColor}" font-family="JetBrains Mono,monospace">${letter}</text>`;
       });
     }
 
@@ -453,8 +544,6 @@ function render(){
   sv.innerHTML=h;
   drawLeg(scale,minAA,maxAA);
   document.getElementById('tooltip-bar').textContent='';
-
-  // Auto-pin residues of interest
   pinned=new Set([...hlts]);
   applyPinned();
 }
@@ -466,9 +555,9 @@ function drawLeg(sc,mn,mx){
   document.getElementById('leg-min').textContent=fmt(mn);
   document.getElementById('leg-max').textContent=fmt(mx);
 }
-function clrArcs(){document.querySelectorAll('#sv .arc').forEach(a=>a.classList.remove('hi','dim','pinned'));}
+function clrArcs(){document.querySelectorAll('#sv .arc').forEach(a=>a.classList.remove('hi','dim'));}
 
-// ── Interaction: hover + click-to-pin ────────────────────────────────────────
+// ── Interaction: hover + click-to-pin ─────────────────────────────────────────
 document.getElementById('sv').addEventListener('click',e=>{
   const pill=e.target.closest('.pill');
   if(pill){
@@ -477,7 +566,6 @@ document.getElementById('sv').addEventListener('click',e=>{
     else pinned.add(pos);
     applyPinned();
   } else if(!e.target.closest('.arc')){
-    // clicking empty space clears manual pins but keeps residues-of-interest pins
     const hlts=parseHlt(document.getElementById('ihlt').value);
     pinned=new Set([...hlts]);
     applyPinned();
@@ -496,7 +584,6 @@ document.getElementById('sv').addEventListener('mouseover',e=>{
     if(act&&!isND(+act))   tip+=`  ·  max_act=${(+act).toFixed(2)}`;
     if(aas)                tip+=`  ·  best AAs: ${aas}`;
     document.getElementById('tooltip-bar').textContent=tip;
-    // only show hover highlight if nothing is pinned
     if(pinned.size===0){
       document.querySelectorAll('#sv .arc').forEach(a=>{
         if(+a.dataset.a===p||+a.dataset.b===p){a.classList.add('hi');a.classList.remove('dim');}
@@ -504,7 +591,8 @@ document.getElementById('sv').addEventListener('mouseover',e=>{
       });
     }
   } else if(arc){
-    document.getElementById('tooltip-bar').textContent=`Contact ${arc.dataset.a}–${arc.dataset.b}  ·  Δ${arc.dataset.b-arc.dataset.a} residues`;
+    const ct=arc.dataset.ct||'other';
+    document.getElementById('tooltip-bar').textContent=`Contact ${arc.dataset.a}–${arc.dataset.b}  ·  ${ct.replace('_',' ')}  ·  Δ${arc.dataset.b-arc.dataset.a} residues`;
   }
 });
 
@@ -537,6 +625,25 @@ async function loadDefaults(){
       s.style.color='var(--text-lo)';
     }
   }));
+
+  // Load metadata to populate footer/header
+  try{
+    const r=await fetch('./data/contacts_meta.csv');
+    if(r.ok){
+      const text=await r.text();
+      const lines=text.trim().split('\n');
+      if(lines.length>=2){
+        const hdr=lines[0].split(',').map(h=>h.trim());
+        const vals=lines[1].split(',').map(v=>v.trim());
+        const meta=Object.fromEntries(hdr.map((h,i)=>[h,vals[i]]));
+        const info=`NucB · Bacillus licheniformis · ${meta.pdb||'5OMT'} · chain ${meta.chain||'A'} · Cβ–Cβ ${meta.cutoff_A||'6'} Å · ${meta.n_contacts||''} contacts`;
+        document.getElementById('footer-contact-info').textContent=info;
+        document.getElementById('header-sub').textContent=
+          `Arc diagram — coverage × contacts × secondary structure · Cβ–Cβ ${meta.cutoff_A||'6'} Å`;
+      }
+    }
+  }catch{}
+
   render();
 }
 
