@@ -1,9 +1,15 @@
 type,start,end
 sheet,38,41
+turn,42,46
 helix,47,60
+turn,61,64
 sheet,65,67
+turn,68,71
 helix,72,82
+loop,83,89
 sheet,90,95
+loop,96,107
 sheet,108,113
 helix,114,129
+loop,130,135
 sheet,136,140
