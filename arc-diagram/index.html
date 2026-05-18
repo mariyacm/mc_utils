@@ -46,8 +46,7 @@
   .swatch.strand { background: #E6F2DC; border-color: var(--green); }
   .swatch.hlt    { background: #D3D1C7; border: 2px solid #111; }
   .swatch.nodata { background: #E8E6DE; border: 1px dashed #AAA8A0; }
-  .swatch.dot    { width: 9px; height: 9px; border-radius: 50%; background: #D85A30; border: none; flex-shrink: 0; }
-  .swatch.ebar   { width: 8px; height: 14px; background: #B5D4F4; border: .5px solid #3A7AC8; border-radius: 2px; flex-shrink: 0; }
+  .swatch.dot    { width: 9px; height: 9px; border-radius: 50%; background: #2E8B3A; border: none; flex-shrink: 0; }  .swatch.ebar   { width: 8px; height: 14px; background: #B5D4F4; border: .5px solid #3A7AC8; border-radius: 2px; flex-shrink: 0; }
   .editor-grid { display: flex; flex-direction: column; gap: 12px; }
   .editor-block { display: flex; flex-direction: column; gap: 4px; }
   .editor-block .col-label { font-family: var(--mono); font-size: 10px; color: var(--text-lo); }
@@ -365,8 +364,9 @@ function render(){
 
     // activity dot (above pill)
     if(showAct && hasActivity && e.activity!==null && e.activity>=actThresh){
-      const dotY = PT - DOT_R - 2;
-      h+=`<circle cx="${cx.toFixed(1)}" cy="${dotY.toFixed(1)}" r="${DOT_R}" fill="#D85A30" opacity=".9"/>`;
+      const dotR = DOT_R * (e.activity / maxActivity);  // scale by activity
+      const dotY = PT - dotR - 2;
+      h+=`<circle cx="${cx.toFixed(1)}" cy="${dotY.toFixed(1)}" r="${dotR.toFixed(1)}" fill="#2E8B3A" opacity=".9"/>`;
     }
 
     h+=`</g>`;
