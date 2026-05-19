@@ -26,6 +26,49 @@
   header h1 { font-family: var(--mono); font-size: 15px; font-weight: 600; letter-spacing: -.3px; }
   header p  { font-size: 12px; color: var(--text-lo); font-weight: 300; }
   .badge { margin-left: auto; font-family: var(--mono); font-size: 10px; padding: 3px 8px; border: 1px solid var(--border); border-radius: 99px; color: var(--text-mid); background: var(--bg); }
+
+  /* ── Info bar ── */
+  #infobar {
+    display: flex;
+    gap: 10px;
+    padding: 8px 28px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    flex-wrap: wrap;
+  }
+  .info-card {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    min-width: 180px;
+    flex: 1;
+  }
+  .info-card-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text-lo);
+  }
+  .info-card-value {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-mid);
+    line-height: 1.5;
+  }
+  .info-card-desc {
+    font-family: var(--sans);
+    font-size: 11px;
+    color: var(--text);
+    font-weight: 500;
+    margin-top: 1px;
+  }
+
   main { display: grid; grid-template-columns: 260px 1fr; }
   aside { border-right: 1px solid var(--border); padding: 20px 18px; min-height: calc(100vh - 53px); background: var(--surface); display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
   .section-label { font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text-lo); margin-bottom: 8px; }
@@ -77,15 +120,31 @@
   @media (max-width: 800px) {
     main { grid-template-columns: 1fr; }
     aside { border-right: none; border-bottom: 1px solid var(--border); min-height: unset; }
+    #infobar { padding: 8px 12px; }
   }
 </style>
 </head>
 <body>
 <header>
   <h1>NucB · Mutational Coverage</h1>
-  <p id="header-sub">Arc diagram — coverage × contacts × secondary structure</p>
+  <p>Arc diagram — coverage × contacts × secondary structure</p>
   <span class="badge">mc_utils</span>
 </header>
+
+<!-- Info bar: coverage + contacts metadata -->
+<div id="infobar">
+  <div class="info-card" id="cov-meta-card">
+    <div class="info-card-label">Coverage</div>
+    <div class="info-card-desc" id="cov-meta-desc">—</div>
+    <div class="info-card-value" id="cov-meta-detail">loading…</div>
+  </div>
+  <div class="info-card" id="con-meta-card">
+    <div class="info-card-label">Structure / Contacts</div>
+    <div class="info-card-desc" id="con-meta-desc">—</div>
+    <div class="info-card-value" id="con-meta-detail">loading…</div>
+  </div>
+</div>
+
 <main>
   <aside>
     <div>
@@ -207,7 +266,6 @@
   </div>
 </main>
 <footer>
-  <span id="footer-contact-info">NucB · Bacillus licheniformis · PDB 5OMT</span>
   <span>mc_utils arc diagram</span>
 </footer>
 
@@ -236,6 +294,49 @@ function loadFile(input,textareaId,statusId){
     render();
   };
   reader.readAsText(file);
+}
+
+// ── Parse a small meta CSV into a key→value object ────────────────────────────
+function parseMeta(text){
+  const lines=text.trim().split('\n');
+  if(lines.length<2)return{};
+  const hdr=lines[0].split(',').map(h=>h.trim());
+  const vals=lines[1].split(',').map(v=>v.trim());
+  return Object.fromEntries(hdr.map((h,i)=>[h,vals[i]||'']));
+}
+
+function updateInfoCards(covMeta, conMeta){
+  // Coverage card
+  if(covMeta){
+    const desc=covMeta.description||'';
+    const detail=[
+      covMeta.color_by    ? `color: ${covMeta.color_by}`       : '',
+      covMeta.n_positions ? `${covMeta.n_positions} positions`  : '',
+      covMeta.n_sequences ? `${covMeta.n_sequences} sequences`  : '',
+      covMeta.activity_threshold ? `threshold: ${covMeta.activity_threshold}` : '',
+    ].filter(Boolean).join(' · ');
+    document.getElementById('cov-meta-desc').textContent   = desc||'Coverage data';
+    document.getElementById('cov-meta-detail').textContent = detail||'—';
+  } else {
+    document.getElementById('cov-meta-desc').textContent   = 'Coverage data';
+    document.getElementById('cov-meta-detail').textContent = '—';
+  }
+
+  // Contacts card
+  if(conMeta){
+    const desc=conMeta.description||'';
+    const detail=[
+      conMeta.pdb        ? conMeta.pdb                              : '',
+      conMeta.chain      ? `chain ${conMeta.chain}`                 : '',
+      conMeta.cutoff_A   ? `Cβ–Cβ ${conMeta.cutoff_A} Å`           : '',
+      conMeta.n_contacts ? `${conMeta.n_contacts} contacts`         : '',
+    ].filter(Boolean).join(' · ');
+    document.getElementById('con-meta-desc').textContent   = desc||'Structure contacts';
+    document.getElementById('con-meta-detail').textContent = detail||'—';
+  } else {
+    document.getElementById('con-meta-desc').textContent   = 'Structure contacts';
+    document.getElementById('con-meta-detail').textContent = '—';
+  }
 }
 
 const SC={
@@ -375,17 +476,16 @@ function render(){
   const maxActivityAll    = hasActivity ?Math.max(...muts.map(d=>d.activity??0)):1;
   const maxActivitySingle = hasActivitySingle?Math.max(...muts.map(d=>d.activity_single??0)):1;
 
-  // Which columns to use
-  const useActivity = showSingle && hasActivitySingle;
-  const useAAs      = showSingle && hasAasSingle;
-  const maxActivity = useActivity ? maxActivitySingle : maxActivityAll;
-  const hasActForDots = useActivity ? hasActivitySingle : hasActivity;
+  const useActivity   = showSingle&&hasActivitySingle;
+  const useAAs        = showSingle&&hasAasSingle;
+  const maxActivity   = useActivity?maxActivitySingle:maxActivityAll;
+  const hasActForDots = useActivity?hasActivitySingle:hasActivity;
 
   const ML=20,MR=30,PW=10,PH=38;
   const AA_FONT=9,AA_LINE_H=10;
   const aasSource=(useAAs?hasAasSingle:hasAAs)
-    ? muts.map(d=>(useAAs?(d.aas_single?d.aas_single.split(',').length:0):(d.aas?d.aas.split(',').length:0)))
-    : [0];
+    ?muts.map(d=>(useAAs?(d.aas_single?d.aas_single.split(',').length:0):(d.aas?d.aas.split(',').length:0)))
+    :[0];
   const maxAAsLines=(showAAs&&(useAAs?hasAasSingle:hasAAs))?Math.max(...aasSource):0;
   const AA_BLOCK_H=maxAAsLines*AA_LINE_H;
   const AA_GAP=AA_BLOCK_H>0?3:0;
@@ -462,9 +562,8 @@ function render(){
     const txtc=nd?'rgba(0,0,0,.4)':tc(scale.lo,scale.hi,t);
     const label=e.res?`${e.res}${i}`:String(i);
     const isHlt=hlts.has(i);
-
-    const actVal = useActivity ? e.activity_single : e.activity;
-    const aasVal = useAAs     ? e.aas_single      : e.aas;
+    const actVal=useActivity?e.activity_single:e.activity;
+    const aasVal=useAAs?e.aas_single:e.aas;
 
     h+=`<g class="pill" data-pos="${i}" data-num="${nd?'—':e.num}" data-res="${e.res}" data-entropy="${e.entropy??''}" data-activity="${actVal??''}" data-aas="${aasVal??''}" data-nd="${nd}">`;
     h+=`<rect x="${(cx-PW/2).toFixed(1)}" y="${PT}" width="${PW}" height="${PH}" rx="4" fill="${bgfill}" stroke="${isHlt?'#111':(nd?'#AAA8A0':'rgba(0,0,0,.14)')}" stroke-width="${isHlt?'2':(nd?'.8':'.5')}" stroke-dasharray="${nd&&!isHlt?'3,2':'none'}"/>`;
@@ -576,21 +675,19 @@ async function loadDefaults(){
       s.textContent='not found — upload your own'; s.style.color='var(--text-lo)';
     }
   }));
+
+  // Load both meta files and update info cards
+  let covMeta=null, conMeta=null;
+  try{
+    const r=await fetch('./data/coverage_meta.csv');
+    if(r.ok) covMeta=parseMeta(await r.text());
+  }catch{}
   try{
     const r=await fetch('./data/contacts_meta.csv');
-    if(r.ok){
-      const lines=(await r.text()).trim().split('\n');
-      if(lines.length>=2){
-        const hdr=lines[0].split(',').map(h=>h.trim());
-        const vals=lines[1].split(',').map(v=>v.trim());
-        const meta=Object.fromEntries(hdr.map((h,i)=>[h,vals[i]]));
-        document.getElementById('footer-contact-info').textContent=
-          `NucB · Bacillus licheniformis · ${meta.pdb||'5OMT'} · chain ${meta.chain||'A'} · Cβ–Cβ ${meta.cutoff_A||'6'} Å · ${meta.n_contacts||''} contacts`;
-        document.getElementById('header-sub').textContent=
-          `Arc diagram — coverage × contacts × secondary structure · Cβ–Cβ ${meta.cutoff_A||'6'} Å`;
-      }
-    }
+    if(r.ok) conMeta=parseMeta(await r.text());
   }catch{}
+  updateInfoCards(covMeta, conMeta);
+
   render();
 }
 
