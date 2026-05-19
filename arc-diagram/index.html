@@ -6,6 +6,7 @@
 <title>NucB — Mutational Coverage Arc Diagram</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ngl/2.0.0-dev.37/ngl.js"></script>
 <style>
   :root {
     --bg:       #F7F6F2;
@@ -64,7 +65,8 @@
   textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
   .update-btn { font-family: var(--mono); font-size: 11px; font-weight: 600; padding: 8px 14px; border: none; border-radius: 6px; background: var(--text); color: var(--bg); cursor: pointer; width: 100%; letter-spacing: .04em; transition: background .15s; margin-top: 2px; }
   .update-btn:hover { background: var(--accent); }
-  #vizpanel { padding: 24px 24px 24px 28px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  #rightpanel { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  #vizpanel { padding: 24px 24px 12px 28px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
   #tooltip-bar { font-family: var(--mono); font-size: 12px; color: var(--text); height: 18px; letter-spacing: .02em; }
   #svgwrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
   #loading { font-family: var(--mono); font-size: 11px; color: var(--text-lo); padding: 40px; text-align: center; }
@@ -73,6 +75,12 @@
   .arc.hi  { opacity: .92; stroke-width: 1.6; }
   .arc.dim { opacity: .04; }
   .pill { cursor: pointer; }
+  #viewer3d-panel { border-top: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; }
+  #viewer3d-header { display: flex; align-items: center; gap: 12px; padding: 8px 28px; border-bottom: 1px solid var(--border); background: var(--bg); }
+  #viewer3d-header span { font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text-lo); }
+  #viewer3d-status { font-family: var(--mono); font-size: 10px; color: var(--text-lo); margin-left: auto; }
+  #ngl-viewport { width: 100%; height: 400px; background: #1A1916; position: relative; }
+  #ngl-loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-family: var(--mono); font-size: 11px; color: #888; }
   footer { border-top: 1px solid var(--border); padding: 10px 32px; font-family: var(--mono); font-size: 10px; color: var(--text-lo); display: flex; gap: 16px; background: var(--surface); }
   @media (max-width: 800px) {
     main { grid-template-columns: 1fr; }
@@ -95,6 +103,7 @@
       <label class="row"><input type="checkbox" id="centr" checked onchange="render()"> Entropy bars</label>
       <label class="row"><input type="checkbox" id="cact" checked onchange="render()"> Activity dots</label>
       <label class="row"><input type="checkbox" id="caas" checked onchange="render()"> Best-activity AAs</label>
+      <label class="row"><input type="checkbox" id="csingle" onchange="render()"> Single mutants only</label>
     </div>
     <div>
       <div class="section-label">Contact coloring</div>
@@ -163,10 +172,10 @@
     </div>
     <div>
       <div class="section-label">Load data</div>
-      <div class="hlt-hint" style="margin-bottom:6px">Default NucB data loads automatically. Upload your own CSVs to replace.</div>
+      <div class="hlt-hint" style="margin-bottom:6px">Default NucB data loads automatically. Upload to replace.</div>
       <div class="editor-grid">
         <div class="editor-block">
-          <div class="col-label">coverage · position, residue, num_aa [,entropy] [,max_activity] [,max_activity_aas]</div>
+          <div class="col-label">coverage · position, residue, num_aa [,entropy] [,max_activity] [,max_activity_aas] [,max_activity_single] [,max_activity_aas_single]</div>
           <div class="upload-row">
             <button class="upload-btn" onclick="document.getElementById('f-cov').click()">↑ Upload CSV</button>
             <span class="upload-status" id="s-cov">loading…</span>
@@ -192,16 +201,35 @@
           <input type="file" id="f-ss" accept=".csv,.tsv,.txt" onchange="loadFile(this,'iss','s-ss')">
           <textarea id="iss" rows="3" placeholder="or paste CSV here..."></textarea>
         </div>
+        <div class="editor-block">
+          <div class="col-label">structure · PDB file</div>
+          <div class="upload-row">
+            <button class="upload-btn" onclick="document.getElementById('f-pdb').click()">↑ Upload PDB</button>
+            <span class="upload-status" id="s-pdb">loading…</span>
+          </div>
+          <input type="file" id="f-pdb" accept=".pdb,.cif" onchange="loadPDB(this)">
+        </div>
         <button class="update-btn" onclick="render()">↻ Update visualization</button>
       </div>
     </div>
   </aside>
 
-  <div id="vizpanel">
-    <div id="tooltip-bar"></div>
-    <div id="svgwrap">
-      <div id="loading">Loading NucB data…</div>
-      <svg id="sv"></svg>
+  <div id="rightpanel">
+    <div id="vizpanel">
+      <div id="tooltip-bar"></div>
+      <div id="svgwrap">
+        <div id="loading">Loading NucB data…</div>
+        <svg id="sv"></svg>
+      </div>
+    </div>
+    <div id="viewer3d-panel">
+      <div id="viewer3d-header">
+        <span>3D Structure</span>
+        <span id="viewer3d-status">loading…</span>
+      </div>
+      <div id="ngl-viewport">
+        <div id="ngl-loading">Loading structure…</div>
+      </div>
     </div>
   </div>
 </main>
@@ -225,6 +253,84 @@ const AA_COLORS={
   C:'#C8A84B',G:'#888888',
 };
 
+// ── NGL 3D viewer ─────────────────────────────────────────────────────────────
+let nglStage=null, nglComponent=null, consGlobal=[];
+
+function initNGL(){
+  nglStage=new NGL.Stage('ngl-viewport',{backgroundColor:'#1A1916',quality:'medium'});
+  window.addEventListener('resize',()=>{if(nglStage)nglStage.handleResize();});
+}
+
+async function loadStructureFromUrl(url,label){
+  if(!nglStage)initNGL();
+  document.getElementById('ngl-loading').style.display='block';
+  document.getElementById('viewer3d-status').textContent='loading…';
+  try{
+    if(nglComponent){nglStage.removeComponent(nglComponent);nglComponent=null;}
+    nglComponent=await nglStage.loadFile(url,{ext:url.endsWith('.cif')?'cif':'pdb'});
+    applyDefaultRepresentation();
+    document.getElementById('ngl-loading').style.display='none';
+    document.getElementById('viewer3d-status').textContent=label||url;
+  }catch(e){
+    document.getElementById('ngl-loading').textContent='Could not load structure.';
+    document.getElementById('viewer3d-status').textContent='error';
+  }
+}
+
+async function loadStructureFromBlob(blob,filename){
+  if(!nglStage)initNGL();
+  document.getElementById('ngl-loading').style.display='block';
+  document.getElementById('viewer3d-status').textContent='loading…';
+  try{
+    if(nglComponent){nglStage.removeComponent(nglComponent);nglComponent=null;}
+    const ext=filename.endsWith('.cif')?'cif':'pdb';
+    nglComponent=await nglStage.loadFile(
+      new NGL.StringBlob(await blob.text(),{type:'text/plain'}),{ext}
+    );
+    applyDefaultRepresentation();
+    document.getElementById('ngl-loading').style.display='none';
+    document.getElementById('viewer3d-status').textContent=filename;
+  }catch(e){
+    document.getElementById('ngl-loading').textContent='Could not load structure.';
+    document.getElementById('viewer3d-status').textContent='error';
+  }
+}
+
+function applyDefaultRepresentation(){
+  if(!nglComponent)return;
+  nglComponent.removeAllRepresentations();
+  nglComponent.addRepresentation('cartoon',{sele:'helix',           color:'#3A7AC8',opacity:1.0});
+  nglComponent.addRepresentation('cartoon',{sele:'sheet',           color:'#4E8A1A',opacity:1.0});
+  nglComponent.addRepresentation('cartoon',{sele:'not(helix or sheet)',color:'#CCCAB8',opacity:1.0});
+  nglStage.autoView();
+}
+
+function highlightResidue(posSele, contactPositions){
+  if(!nglComponent)return;
+  nglComponent.removeAllRepresentations();
+  // Dimmed cartoon
+  nglComponent.addRepresentation('cartoon',{sele:'helix',           color:'#3A7AC8',opacity:.35});
+  nglComponent.addRepresentation('cartoon',{sele:'sheet',           color:'#4E8A1A',opacity:.35});
+  nglComponent.addRepresentation('cartoon',{sele:'not(helix or sheet)',color:'#CCCAB8',opacity:.35});
+  // Selected residue — orange sticks
+  nglComponent.addRepresentation('ball+stick',{sele:posSele,    color:'#D85A30',opacity:1.0,radiusScale:1.2});
+  // Contact partners — gray sticks
+  if(contactPositions.length>0){
+    const cSele=contactPositions.join(' or ');
+    nglComponent.addRepresentation('ball+stick',{sele:cSele,color:'#AAAAAA',opacity:.9,radiusScale:0.9});
+  }
+  nglComponent.autoView(posSele, 1500);
+}
+
+function resetStructure(){ if(nglComponent) applyDefaultRepresentation(); }
+
+function loadPDB(input){
+  const file=input.files[0]; if(!file)return;
+  const s=document.getElementById('s-pdb');
+  s.textContent=file.name; s.classList.add('ok');
+  loadStructureFromBlob(file,file.name);
+}
+
 function loadFile(input,textareaId,statusId){
   const file=input.files[0]; if(!file)return;
   const reader=new FileReader();
@@ -237,6 +343,7 @@ function loadFile(input,textareaId,statusId){
   reader.readAsText(file);
 }
 
+// ── Color scales ──────────────────────────────────────────────────────────────
 const SC={
   'White → Purple':{lo:[252,251,253],hi:[160,130,210]},
   'White → Red':   {lo:[255,245,245],hi:[180,20,20]},
@@ -262,23 +369,31 @@ function parseCsvLine(line){
   r.push(cur); return r;
 }
 
+// ── CSV parsers ───────────────────────────────────────────────────────────────
 function pmut(s){
   const lines=s.trim().split('\n'); if(lines.length<2)return[];
   const hdr=lines[0].split(',').map(h=>h.trim().toLowerCase());
-  const posIdx=hdr.indexOf('position'),resIdx=hdr.indexOf('residue'),
-        numIdx=hdr.indexOf('num_aa'),entrIdx=hdr.indexOf('entropy'),
-        actIdx=hdr.findIndex(h=>h==='max_activity'||h==='mean_activity'),
-        aasIdx=hdr.indexOf('max_activity_aas');
+  const posIdx   = hdr.indexOf('position');
+  const resIdx   = hdr.indexOf('residue');
+  const numIdx   = hdr.indexOf('num_aa');
+  const entrIdx  = hdr.indexOf('entropy');
+  const actIdx   = hdr.findIndex(h=>h==='max_activity'||h==='mean_activity');
+  const aasIdx   = hdr.indexOf('max_activity_aas');
+  const actSIdx  = hdr.indexOf('max_activity_single');
+  const aasSIdx  = hdr.indexOf('max_activity_aas_single');
   const r=[];
   for(const l of lines.slice(1)){
     const p=parseCsvLine(l);
     const pos=+(p[posIdx]?.trim()); if(isNaN(pos))continue;
     r.push({
-      pos,res:p[resIdx]?.trim()??'',
-      num:    isND(p[numIdx]?.trim())  ?null:+(p[numIdx].trim()),
-      entropy:isND(p[entrIdx]?.trim())?null:+(p[entrIdx]?.trim()),
-      activity:isND(p[actIdx]?.trim())?null:+(p[actIdx]?.trim()),
-      aas:aasIdx>=0?(p[aasIdx]?.trim()||null):null,
+      pos,
+      res:          p[resIdx]?.trim()??'',
+      num:          isND(p[numIdx]?.trim())  ?null:+(p[numIdx].trim()),
+      entropy:      isND(p[entrIdx]?.trim()) ?null:+(p[entrIdx]?.trim()),
+      activity:     isND(p[actIdx]?.trim())  ?null:+(p[actIdx]?.trim()),
+      aas:          aasIdx >=0?(p[aasIdx]?.trim()||null):null,
+      activity_single: isND(p[actSIdx]?.trim())?null:+(p[actSIdx]?.trim()),
+      aas_single:   aasSIdx>=0?(p[aasSIdx]?.trim()||null):null,
     });
   }
   return r;
@@ -325,6 +440,7 @@ function assignHeights(cons,xf){
 }
 
 let pinned=new Set();
+
 function applyPinned(){
   if(pinned.size===0){clrArcs();return;}
   document.querySelectorAll('#sv .arc').forEach(a=>{
@@ -334,20 +450,28 @@ function applyPinned(){
   });
 }
 
+function getContactPartners(pos){
+  return consGlobal.filter(c=>c.a===pos||c.b===pos).map(c=>c.a===pos?c.b:c.a);
+}
+
+// ── Main render ───────────────────────────────────────────────────────────────
 function render(){
-  const muts    =pmut(document.getElementById('imut').value);
-  const cons    =pcon(document.getElementById('icon').value);
-  const ss      =pss(document.getElementById('iss').value);
-  const hlts    =parseHlt(document.getElementById('ihlt').value);
-  const showCon =document.getElementById('ccon').checked;
-  const showSS  =document.getElementById('css').checked;
-  const showEntr=document.getElementById('centr').checked;
-  const showAct =document.getElementById('cact').checked;
-  const showAAs =document.getElementById('caas').checked;
-  const arcMode =document.getElementById('arcmode').value;
-  const actThresh=+document.getElementById('actthresh').value;
-  const scale   =SC[document.getElementById('cscl').value]||SC['White → Purple'];
+  const muts      = pmut(document.getElementById('imut').value);
+  const cons      = pcon(document.getElementById('icon').value);
+  const ss        = pss(document.getElementById('iss').value);
+  const hlts      = parseHlt(document.getElementById('ihlt').value);
+  const showCon   = document.getElementById('ccon').checked;
+  const showSS    = document.getElementById('css').checked;
+  const showEntr  = document.getElementById('centr').checked;
+  const showAct   = document.getElementById('cact').checked;
+  const showAAs   = document.getElementById('caas').checked;
+  const showSingle= document.getElementById('csingle').checked;
+  const arcMode   = document.getElementById('arcmode').value;
+  const actThresh = +document.getElementById('actthresh').value;
+  const scale     = SC[document.getElementById('cscl').value]||SC['White → Purple'];
   if(!muts.length)return;
+
+  consGlobal=cons;
 
   document.getElementById('loading').style.display='none';
   document.getElementById('sv').style.display='block';
@@ -356,21 +480,35 @@ function render(){
   const valid=muts.map(d=>d.num).filter(v=>!isND(v));
   const maxAA=valid.length?Math.max(...valid):1;
   const minAA=valid.length?Math.min(...valid):0;
-  const hasEntropy =muts.some(d=>d.entropy!==null);
-  const hasActivity=muts.some(d=>d.activity!==null);
-  const hasAAs     =muts.some(d=>d.aas!==null&&d.aas!=='');
-  const maxEntropy =hasEntropy ?Math.max(...muts.map(d=>d.entropy??0)):1;
-  const maxActivity=hasActivity?Math.max(...muts.map(d=>d.activity??0)):1;
+  const hasEntropy       = muts.some(d=>d.entropy!==null);
+  const hasActivity      = muts.some(d=>d.activity!==null);
+  const hasActivitySingle= muts.some(d=>d.activity_single!==null);
+  const hasAAs           = muts.some(d=>d.aas!==null&&d.aas!=='');
+  const hasAasSingle     = muts.some(d=>d.aas_single!==null&&d.aas_single!=='');
+  const maxEntropy       = hasEntropy  ?Math.max(...muts.map(d=>d.entropy??0)):1;
+  const maxActivityAll   = hasActivity ?Math.max(...muts.map(d=>d.activity??0)):1;
+  const maxActivitySingle= hasActivitySingle?Math.max(...muts.map(d=>d.activity_single??0)):1;
+
+  // Which activity / aas columns to use based on toggle
+  const useActivity = showSingle && hasActivitySingle;
+  const useAAs      = showSingle && hasAasSingle;
+  const maxActivity = useActivity ? maxActivitySingle : maxActivityAll;
 
   const ML=20,MR=30,PW=10,PH=38;
   const AA_FONT=9,AA_LINE_H=10;
-  const maxAAsLines=(showAAs&&hasAAs)?Math.max(...muts.map(d=>(d.aas?d.aas.split(',').length:0))):0;
+
+  // Determine max AA lines from whichever column is active
+  const aasSource = useAAs
+    ? muts.map(d=>(d.aas_single?d.aas_single.split(',').length:0))
+    : muts.map(d=>(d.aas?d.aas.split(',').length:0));
+  const maxAAsLines=(showAAs&&(useAAs?hasAasSingle:hasAAs))?Math.max(...aasSource):0;
   const AA_BLOCK_H=maxAAsLines*AA_LINE_H;
   const AA_GAP=AA_BLOCK_H>0?3:0;
   const EBAR_MAX=showEntr&&hasEntropy?20:0;
   const EBAR_GAP=EBAR_MAX>0?4:0;
   const DOT_R=3.5;
-  const DOT_GAP=showAct&&hasActivity?DOT_R*2+3:0;
+  const hasActForDots = useActivity ? hasActivitySingle : hasActivity;
+  const DOT_GAP=showAct&&hasActForDots?DOT_R*2+3:0;
   const SS_H=14;
 
   const avail=Math.max(700,document.getElementById('vizpanel').clientWidth-52);
@@ -406,12 +544,9 @@ function render(){
   }
 
   if(showSS&&ss.length>0){
-    // Full-width loop backbone line
     const ssMin=Math.min(...ss.map(s=>s.start));
     const ssMax=Math.max(...ss.map(s=>s.end));
     h+=`<line x1="${(xf(ssMin)-PW/2).toFixed(1)}" y1="${SS_MID.toFixed(1)}" x2="${(xf(ssMax)+PW/2).toFixed(1)}" y2="${SS_MID.toFixed(1)}" stroke="#CCCAB8" stroke-width=".8"/>`;
-
-    // Helix and sheet on top — turns and loops are just the line
     for(const s of ss){
       const xs=xf(s.start)-PW/2,xe=xf(s.end)+PW/2,w=xe-xs,mx=(xs+xe)/2;
       if(s.type==='helix'){
@@ -423,7 +558,6 @@ function render(){
         h+=`<polygon points="${pts}" fill="#E6F2DC" stroke="#4E8A1A" stroke-width=".5"/>`;
         h+=`<text x="${((xs+bx2)/2).toFixed(1)}" y="${(ym+1).toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="9" font-weight="500" fill="#27500A" font-family="DM Sans,sans-serif">β</text>`;
       }
-      // turns and loops → no annotation, just the backbone line
     }
   }
 
@@ -436,7 +570,7 @@ function render(){
 
   for(let i=1;i<=n;i++){
     const cx=xf(i);
-    const e=cov[i]||{num:null,res:'',entropy:null,activity:null,aas:null};
+    const e=cov[i]||{num:null,res:'',entropy:null,activity:null,aas:null,activity_single:null,aas_single:null};
     const nd=isND(e.num);
     const t=nd?0:(maxAA>minAA?(e.num-minAA)/(maxAA-minAA):0.5);
     const fill=nd?`url(#${did})`:c3(scale.lo,scale.hi,t);
@@ -445,15 +579,21 @@ function render(){
     const label=e.res?`${e.res}${i}`:String(i);
     const isHlt=hlts.has(i);
 
-    h+=`<g class="pill" data-pos="${i}" data-num="${nd?'—':e.num}" data-res="${e.res}" data-entropy="${e.entropy??''}" data-activity="${e.activity??''}" data-aas="${e.aas??''}" data-nd="${nd}">`;
+    // Pick activity and aas based on single mutant toggle
+    const actVal = useActivity ? e.activity_single : e.activity;
+    const aasVal  = useAAs     ? e.aas_single      : e.aas;
+
+    h+=`<g class="pill" data-pos="${i}" data-num="${nd?'—':e.num}" data-res="${e.res}" data-entropy="${e.entropy??''}" data-activity="${actVal??''}" data-aas="${aasVal??''}" data-nd="${nd}">`;
     h+=`<rect x="${(cx-PW/2).toFixed(1)}" y="${PT}" width="${PW}" height="${PH}" rx="4" fill="${bgfill}" stroke="${isHlt?'#111':(nd?'#AAA8A0':'rgba(0,0,0,.14)')}" stroke-width="${isHlt?'2':(nd?'.8':'.5')}" stroke-dasharray="${nd&&!isHlt?'3,2':'none'}"/>`;
     if(!nd){
       h+=`<rect x="${(cx-PW/2).toFixed(1)}" y="${PT}" width="${PW}" height="${PH}" rx="4" fill="${fill}" stroke="${isHlt?'#111':'rgba(0,0,0,.14)'}" stroke-width="${isHlt?'2':'.5'}"/>`;
     }
     h+=`<text transform="rotate(-90,${cx.toFixed(1)},${BY})" x="${cx.toFixed(1)}" y="${BY+.5}" text-anchor="middle" dominant-baseline="central" font-size="8.5" fill="${txtc}" font-family="JetBrains Mono,monospace">${label}</text>`;
 
-    if(showAAs&&hasAAs&&e.aas&&e.aas!==''){
-      const letters=e.aas.split(',');
+    // Best-activity AAs (single or all depending on toggle)
+    const hasAAsForPill = useAAs ? hasAasSingle : hasAAs;
+    if(showAAs&&hasAAsForPill&&aasVal&&aasVal!==''){
+      const letters=aasVal.split(',');
       letters.forEach((aa,li)=>{
         const letter=aa.trim().toUpperCase();
         const aaColor=AA_COLORS[letter]||'#2E8B3A';
@@ -468,8 +608,9 @@ function render(){
       h+=`<rect x="${(cx-PW/2+1).toFixed(1)}" y="${barY.toFixed(1)}" width="${PW-2}" height="${barH.toFixed(1)}" rx="1" fill="#A8A8A0" opacity=".75"/>`;
     }
 
-    if(showAct&&hasActivity&&e.activity!==null&&e.activity>=actThresh){
-      const dotR=DOT_R*(e.activity/maxActivity);
+    // Activity dot
+    if(showAct&&hasActForDots&&actVal!==null&&!isND(actVal)&&actVal>=actThresh){
+      const dotR=DOT_R*(actVal/maxActivity);
       const dotY=PT-dotR-2;
       h+=`<circle cx="${cx.toFixed(1)}" cy="${dotY.toFixed(1)}" r="${dotR.toFixed(1)}" fill="#2E8B3A" opacity=".9"/>`;
     }
@@ -499,11 +640,26 @@ document.getElementById('sv').addEventListener('click',e=>{
   const pill=e.target.closest('.pill');
   if(pill){
     const pos=+pill.dataset.pos;
-    if(pinned.has(pos))pinned.delete(pos); else pinned.add(pos);
+    if(pinned.has(pos)){pinned.delete(pos);}
+    else{pinned.add(pos);}
     applyPinned();
+    if(pinned.size===0) resetStructure();
+    else{
+      const allPartners=[...new Set(
+        [...pinned].flatMap(p=>getContactPartners(p)).filter(p=>!pinned.has(p))
+      )];
+      highlightResidue([...pinned].join(' or '),allPartners);
+    }
   }else if(!e.target.closest('.arc')){
     pinned=new Set([...parseHlt(document.getElementById('ihlt').value)]);
     applyPinned();
+    if(pinned.size===0) resetStructure();
+    else{
+      const allPartners=[...new Set(
+        [...pinned].flatMap(p=>getContactPartners(p)).filter(p=>!pinned.has(p))
+      )];
+      highlightResidue([...pinned].join(' or '),allPartners);
+    }
   }
 });
 
@@ -548,37 +704,36 @@ async function loadDefaults(){
   await Promise.all(files.map(async f=>{
     try{
       const r=await fetch(f.url); if(!r.ok)throw new Error();
-      const text=await r.text();
-      document.getElementById(f.id).value=text;
+      document.getElementById(f.id).value=await r.text();
       const s=document.getElementById(f.sid);
       s.textContent=f.label; s.classList.add('ok');
     }catch{
       const s=document.getElementById(f.sid);
-      s.textContent='not found — upload your own';
-      s.style.color='var(--text-lo)';
+      s.textContent='not found — upload your own'; s.style.color='var(--text-lo)';
     }
   }));
   try{
     const r=await fetch('./data/contacts_meta.csv');
     if(r.ok){
-      const text=await r.text();
-      const lines=text.trim().split('\n');
+      const lines=(await r.text()).trim().split('\n');
       if(lines.length>=2){
         const hdr=lines[0].split(',').map(h=>h.trim());
         const vals=lines[1].split(',').map(v=>v.trim());
         const meta=Object.fromEntries(hdr.map((h,i)=>[h,vals[i]]));
-        const info=`NucB · Bacillus licheniformis · ${meta.pdb||'5OMT'} · chain ${meta.chain||'A'} · Cβ–Cβ ${meta.cutoff_A||'6'} Å · ${meta.n_contacts||''} contacts`;
-        document.getElementById('footer-contact-info').textContent=info;
+        document.getElementById('footer-contact-info').textContent=
+          `NucB · Bacillus licheniformis · ${meta.pdb||'5OMT'} · chain ${meta.chain||'A'} · Cβ–Cβ ${meta.cutoff_A||'6'} Å · ${meta.n_contacts||''} contacts`;
         document.getElementById('header-sub').textContent=
           `Arc diagram — coverage × contacts × secondary structure · Cβ–Cβ ${meta.cutoff_A||'6'} Å`;
       }
     }
   }catch{}
   render();
+  loadStructureFromUrl('./data/5OMT.pdb','5OMT.pdb (default)');
 }
 
 drawLeg(SC['White → Purple'],0,20);
 window.addEventListener('resize',()=>render());
+initNGL();
 loadDefaults();
 </script>
 </body>
